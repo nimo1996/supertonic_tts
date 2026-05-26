@@ -3,15 +3,16 @@ from pathlib import Path
 
 import numpy as np
 
-SUPPORTED_LANGS = {
-    "ko", "en", "ja", "zh", "fr", "es", "de", "it", "pt", "ru",
-    "vi", "th", "id", "tl", "uz", "mn", "hi", "ar",
-}
-
 VOICES = ["F1", "F2", "F3", "F4", "F5", "M1", "M2", "M3", "M4", "M5"]
 
 
 class SupertonicEngine:
+    # Supertonic v3 공식 지원 언어
+    SUPPORTED_LANGS = {
+        "ko", "en", "ja", "ar", "bg", "cs", "da", "de", "el", "es",
+        "et", "fi", "fr", "hi", "hr", "hu", "id", "it", "lt", "lv",
+        "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi",
+    }
     def __init__(self, voice: str = "M2", speed: float = 1.05, steps: int = 8):
         from supertonic import TTS
         self._tts = TTS(auto_download=True)
@@ -20,7 +21,7 @@ class SupertonicEngine:
         self.steps = steps
 
     def supports(self, lang: str) -> bool:
-        return lang.lower() in SUPPORTED_LANGS
+        return lang.lower() in self.SUPPORTED_LANGS
 
     def generate(
         self,

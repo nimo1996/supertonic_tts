@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-multilingual-tts  —  상업용 다국어 TTS (CPU 우선)
-엔진: Supertonic v3 (MIT) · MeloTTS (MIT) · Kokoro (Apache 2.0)
+multilingual-tts  —  상업용 다국어 TTS
+엔진: Supertonic v3 (MIT / OpenRAIL-M)
 """
 import argparse
 import sys
@@ -11,7 +11,7 @@ import yaml
 
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
 
-_engines: dict = {}
+_engine = None
 
 
 # ─── config ──────────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ def load_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
-def cfg_get(config: dict, *keys, default=None):
+def cfg(config: dict, *keys, default=None):
     node = config
     for k in keys:
         if not isinstance(node, dict):
@@ -34,47 +34,29 @@ def cfg_get(config: dict, *keys, default=None):
     return node
 
 
-# ─── engine loader ───────────────────────────────────────────────────────────
+# ─── engine ──────────────────────────────────────────────────────────────────
 
-def get_engine(name: str, config: dict):
-    if name not in _engines:
-        if name == "supertonic":
-            from engines.supertonic_engine import SupertonicEngine
-            _engines[name] = SupertonicEngine(
-                voice=cfg_get(config, "supertonic", "voice", default="M2"),
-                speed=cfg_get(config, "supertonic", "speed", default=1.05),
-                steps=cfg_get(config, "supertonic", "steps", default=8),
-            )
-        elif name == "melo":
-            from engines.melo_engine import MeloEngine
-            _engines[name] = MeloEngine()
-        elif name == "kokoro":
-            from engines.kokoro_engine import KokoroEngine
-            _engines[name] = KokoroEngine()
-        else:
-            print(f"[오류] 알 수 없는 엔진: {name}", file=sys.stderr)
-            sys.exit(1)
-    return _engines[name]
-
-
-def pick_engine(lang: str, preferred: str, config: dict):
-    """선호 엔진이 해당 언어를 지원하면 사용, 아니면 지원 가능한 엔진 탐색."""
-    order = [preferred] + [e for e in ("supertonic", "melo", "kokoro") if e != preferred]
-    for name in order:
-        engine = get_engine(name, config)
-        if engine.supports(lang):
-            return name, engine
-    return None, None
+def get_engine(config: dict):
+    global _engine
+    if _engine is None:
+        from engines.supertonic_engine import SupertonicEngine
+        _engine = SupertonicEngine(
+            voice=cfg(config, "supertonic", "voice", default="M2"),
+            speed=cfg(config, "supertonic", "speed", default=1.05),
+            steps=cfg(config, "supertonic", "steps", default=8),
+        )
+    return _engine
 
 
 # ─── lang detection ──────────────────────────────────────────────────────────
 
 FILENAME_LANG = {
-    "korean": "ko", "english": "en", "chinese": "zh", "japanese": "ja",
-    "vietnamese": "vi", "russian": "ru", "thai": "th", "indonesian": "id",
-    "tagalog": "tl", "uzbek": "uz", "mongolian": "mn",
-    "french": "fr", "spanish": "es", "italian": "it",
-    "portuguese": "pt", "hindi": "hi", "arabic": "ar", "german": "de",
+    "korean": "ko",     "english": "en",    "chinese": "zh",
+    "japanese": "ja",   "vietnamese": "vi", "russian": "ru",
+    "thai": "th",       "indonesian": "id", "tagalog": "tl",
+    "uzbek": "uz",      "mongolian": "mn",  "french": "fr",
+    "spanish": "es",    "italian": "it",    "portuguese": "pt",
+    "hindi": "hi",      "arabic": "ar",     "german": "de",
 }
 
 
@@ -112,50 +94,47 @@ def cmd_run(args, config: dict):
     if args.output:
         out_path = Path(args.output)
     else:
-        out_dir = Path(cfg_get(config, "output", "directory", default="output"))
+        out_dir = Path(cfg(config, "output", "directory", default="output"))
         out_dir.mkdir(exist_ok=True)
         out_path = out_dir / f"{input_name}_{lang}.wav"
 
-    # 엔진 선택
-    preferred = args.engine or cfg_get(config, "engine", default="supertonic")
-    engine_name, engine = pick_engine(lang, preferred, config)
-    if engine is None:
-        print(f"[오류] 언어 '{lang}'를 지원하는 엔진이 없습니다.", file=sys.stderr)
+    engine = get_engine(config)
+
+    if not engine.supports(lang):
+        print(f"[오류] 지원하지 않는 언어: {lang}", file=sys.stderr)
+        print(f"  지원 언어: {', '.join(sorted(engine.SUPPORTED_LANGS))}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"[TTS] 언어={lang} | 엔진={engine_name} | 출력={out_path}")
+    print(f"[TTS] 언어={lang} | 목소리={args.voice or cfg(config, 'supertonic', 'voice', default='M2')} | 출력={out_path}")
 
-    # 엔진별 추가 옵션
-    kwargs = {}
-    if engine_name == "supertonic":
-        if args.voice:
-            kwargs["voice"] = args.voice
-        if args.speed:
-            kwargs["speed"] = args.speed
-        if args.steps:
-            kwargs["steps"] = args.steps
-    elif engine_name in ("melo", "kokoro"):
-        if args.voice:
-            kwargs["voice"] = args.voice
-        if args.speed:
-            kwargs["speed"] = args.speed
-
-    engine.generate_to_file(text=text, output_path=str(out_path), lang=lang, **kwargs)
+    engine.generate_to_file(
+        text=text,
+        output_path=str(out_path),
+        lang=lang,
+        voice=args.voice or None,
+        speed=args.speed or None,
+        steps=args.steps or None,
+    )
 
 
 def cmd_voices(args, config: dict):
-    engine_name = args.engine or cfg_get(config, "engine", default="supertonic")
-    engine = get_engine(engine_name, config)
-    print(f"[{engine_name}] 사용 가능한 목소리:")
+    engine = get_engine(config)
+    default_voice = cfg(config, "supertonic", "voice", default="M2")
+    print("사용 가능한 목소리 (F=여성, M=남성):")
     for v in engine.get_voices():
-        marker = " ← 현재 기본값" if v == cfg_get(config, engine_name, "voice") else ""
+        marker = " ← 기본값" if v == default_voice else ""
         print(f"  {v}{marker}")
 
 
+def cmd_langs(args, config: dict):
+    engine = get_engine(config)
+    print("지원 언어:")
+    for lang in sorted(engine.SUPPORTED_LANGS):
+        print(f"  {lang}")
+
+
 def cmd_config(args, config: dict):
-    print(f"설정 파일: {CONFIG_PATH}")
-    print()
-    import yaml
+    print(f"설정 파일: {CONFIG_PATH}\n")
     print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
 
 
@@ -165,33 +144,35 @@ def main():
     config = load_config()
 
     parser = argparse.ArgumentParser(
-        description="multilingual-tts: 상업용 다국어 TTS",
+        description="multilingual-tts: 상업용 다국어 TTS (Supertonic v3)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 예시:
   python tts.py --input scripts/korean.txt
   python tts.py --text "안녕하세요" --lang ko
-  python tts.py --text "Hello" --lang en --voice F3
+  python tts.py --text "Hello world" --lang en --voice F3
   python tts.py --voices
+  python tts.py --langs
   python tts.py --config
         """,
     )
-
     parser.add_argument("--input",  "-i", help="입력 텍스트 파일")
     parser.add_argument("--text",   "-t", help="직접 입력 텍스트")
-    parser.add_argument("--lang",   "-l", help="언어 코드 (ko/en/ja/zh/...)")
+    parser.add_argument("--lang",   "-l", help="언어 코드 (ko/en/ja/...)")
     parser.add_argument("--output", "-o", help="출력 WAV 파일 경로")
-    parser.add_argument("--engine", "-e", help="엔진 지정 (supertonic/melo/kokoro)")
-    parser.add_argument("--voice",  "-v", help="목소리 (예: M2, F1, af_heart)")
-    parser.add_argument("--speed",  "-s", type=float, help="발화 속도 (기본: config 값)")
-    parser.add_argument("--steps",        type=int,   help="[supertonic] 생성 품질 단계 (기본: 8)")
-    parser.add_argument("--voices",       action="store_true", help="목소리 목록 출력")
+    parser.add_argument("--voice",  "-v", help="목소리 (F1~F5 / M1~M5)")
+    parser.add_argument("--speed",  "-s", type=float, help="발화 속도 (기본: 1.05)")
+    parser.add_argument("--steps",        type=int,   help="품질 단계 (기본: 8, 높을수록 느리고 좋음)")
+    parser.add_argument("--voices",       action="store_true", help="목소리 목록")
+    parser.add_argument("--langs",        action="store_true", help="지원 언어 목록")
     parser.add_argument("--config",       action="store_true", help="현재 설정 출력")
 
     args = parser.parse_args()
 
     if args.voices:
         cmd_voices(args, config)
+    elif args.langs:
+        cmd_langs(args, config)
     elif args.config:
         cmd_config(args, config)
     else:

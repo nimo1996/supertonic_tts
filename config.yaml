@@ -1,21 +1,10 @@
 # multilingual-tts 설정 파일
 # CLI 옵션이 있으면 이 설정보다 우선합니다
 
-# 기본 엔진 (supertonic | melo | kokoro)
-engine: supertonic
-
 supertonic:
   voice: M2          # F1 F2 F3 F4 F5 / M1 M2 M3 M4 M5
   speed: 1.05        # 발화 속도 (0.5 ~ 2.0)
-  steps: 8           # 생성 품질 단계 (높을수록 느리고 품질 좋음, 4~16)
-
-melo:
-  voice: KR          # 한국어: KR
-  speed: 1.0
-
-kokoro:
-  voice: af_heart    # 영어 등에 사용
-  speed: 1.0
+  steps: 8           # 생성 품질 단계 (4~16, 높을수록 느리고 품질 좋음)
 
 output:
   directory: output  # 출력 폴더
