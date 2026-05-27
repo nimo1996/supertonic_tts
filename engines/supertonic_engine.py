@@ -56,15 +56,36 @@ class SupertonicEngine:
         steps: int | None = None,
         verbose: bool = True,
     ) -> float:
+        lines = [l for l in text.splitlines() if l.strip()]
+        if not lines:
+            lines = [text]
+
         t0 = time.time()
-        wav, sr = self.generate(text, lang=lang, voice=voice, speed=speed, steps=steps)
+        sr = self._tts.sample_rate
+        silence = np.zeros(int(sr * 0.4))  # 줄 사이 0.4초 묵음
+
+        tail_silence = np.zeros(int(sr * 0.15))  # 각 줄 끝 클리핑 방지 패딩
+
+        chunks = []
+        for i, line in enumerate(lines):
+            if verbose and len(lines) > 1:
+                print(f"  [{i+1}/{len(lines)}] {line[:40]}{'...' if len(line) > 40 else ''}")
+            # 문장 종결 부호 없으면 마침표 추가 (모델이 끝을 인식하도록)
+            send = line if line[-1] in ".。!！?？,，" else line + "."
+            wav, _ = self.generate(send, lang=lang, voice=voice, speed=speed, steps=steps)
+            chunks.append(wav)
+            chunks.append(tail_silence)
+            if i < len(lines) - 1:
+                chunks.append(silence)
+
+        full_wav = np.concatenate(chunks)
         elapsed = time.time() - t0
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        self._tts.save_audio(wav[np.newaxis, :], output_path)
+        self._tts.save_audio(full_wav[np.newaxis, :], output_path)
 
         if verbose:
-            audio_dur = len(wav) / sr
+            audio_dur = len(full_wav) / sr
             print(f"  생성: {elapsed:.1f}s | 음성: {audio_dur:.1f}s | RTF: {audio_dur/elapsed:.2f}x | {output_path}")
         return elapsed
 

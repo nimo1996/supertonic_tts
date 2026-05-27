@@ -3,8 +3,8 @@
 
 supertonic:
   voice: M2          # F1 F2 F3 F4 F5 / M1 M2 M3 M4 M5
-  speed: 1.05        # 발화 속도 (0.5 ~ 2.0)
-  steps: 8           # 생성 품질 단계 (4~16, 높을수록 느리고 품질 좋음)
+  speed: 1.0        # 발화 속도 (0.5 ~ 2.0)
+  steps: 16           # 생성 품질 단계 (4~16, 높을수록 느리고 품질 좋음)
 
 output:
   directory: output  # 출력 폴더
