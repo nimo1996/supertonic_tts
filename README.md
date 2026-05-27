@@ -1,159 +1,92 @@
-# Multilingual TTS System
+# multilingual-tts
 
-다국어 텍스트 음성 변환(TTS) 시스템.
-Fish Speech 1.5(주요 언어) + Meta MMS-TTS(확장 언어) 이중 구조.
-
----
-
-## 구성
-
-| 파일 | 역할 |
-|------|------|
-| `tts.py` | Fish Speech 1.5 클라이언트 (8개 주요 언어) |
-| `mms_tts.py` | Meta MMS-TTS 클라이언트 (1100개 언어) |
-| `start_server.sh` | Fish Speech API 서버 시작 스크립트 |
-| `scripts/` | 언어별 TTS 샘플 스크립트 |
+CPU 우선 상업용 다국어 TTS 시스템.  
+한국어 품질 최우선, GPU 없이 실시간 이상의 속도로 자연스러운 음성 생성.
 
 ---
 
-## 지원 언어
+## 엔진: Supertonic v3
 
-### Fish Speech 1.5 (`tts.py`)
-
-공식 지원 8개 언어. 자연스러운 억양과 감정 표현.
-
-| 언어 | 코드 |
+| 항목 | 내용 |
 |------|------|
-| 한국어 | ko |
-| 영어 | en |
-| 중국어 | zh |
-| 일본어 | ja |
-| 프랑스어 | fr |
-| 독일어 | de |
-| 아랍어 | ar |
-| 스페인어 | es |
-
-### Meta MMS-TTS (`mms_tts.py`)
-
-Fish Speech 미지원 언어 대상. 1100개 이상 언어 지원 (CC-BY-NC-4.0).
-
-| 언어 | 코드 | MMS 모델 코드 |
-|------|------|-------------|
-| 베트남어 | vi | vie |
-| 태국어 | th | tha |
-| 필리핀어(Tagalog) | tl / fil | tgl |
-| 인도네시아어 | id | ind |
-| 우즈벡어 (키릴) | uz | uzb-script_cyrillic |
-| 몽골어 | mn | mon |
-| 러시아어 | ru | rus |
-| 힌디어 | hi | hin |
-| 터키어 | tr | tur |
-| 우크라이나어 | uk | ukr |
-
-> ⚠️ 우즈벡어는 키릴 문자 모델만 존재. `scripts/Uzbek.txt`는 키릴 문자로 작성.
+| 개발사 | Supertone Inc. (한국) |
+| 코드 라이센스 | MIT |
+| 모델 라이센스 | BigScience OpenRAIL-M (상업 사용 가능) |
+| 출력 품질 | 44,100Hz 16-bit WAV |
+| CPU 속도 | RTF 3~5x |
+| 목소리 | F1~F5 (여성), M1~M5 (남성) |
+| 지원 언어 | 31개 |
 
 ---
 
 ## 설치
 
 ```bash
-# Fish Speech 의존성
-python3 -m venv venv
-source venv/bin/activate
-pip install -r fish-speech/requirements.txt  # 또는 fish-speech 설치 가이드 참조
-
-# MMS-TTS 의존성 (transformers, scipy는 대부분 이미 설치됨)
-pip install transformers scipy torch
+git clone <repo>
+cd multilingual-tts
+bash setup.sh
 ```
+
+모델(~305MB)은 첫 실행 시 Hugging Face에서 자동 다운로드.
 
 ---
 
-## 실행
-
-### Fish Speech 서버 시작
+## 사용법
 
 ```bash
-./start_server.sh
-# 기본 포트: 8080
-```
+# 파일 변환 (파일명으로 언어 자동 감지)
+.venv/bin/python tts.py --input scripts/korean.txt
 
-### Fish Speech TTS (`tts.py`)
-
-```bash
 # 텍스트 직접 입력
-python3 tts.py "안녕하세요" -o output.wav
+.venv/bin/python tts.py --text "안녕하세요" --lang ko
 
-# 파일에서 읽기 (출력 파일명 자동 설정)
-python3 tts.py -f scripts/korean.txt
+# 출력 경로 지정
+.venv/bin/python tts.py --text "Hello" --lang en --output hello.wav
 
-# 옵션
-python3 tts.py "Hello" -o out.wav --top-p 0.7 --temperature 0.7
+# 목소리 변경
+.venv/bin/python tts.py --text "안녕하세요" --voice F1
+
+# 속도 / 품질 조절
+.venv/bin/python tts.py --input scripts/korean.txt --speed 0.9 --steps 16
 ```
 
-### MMS-TTS (`mms_tts.py`)
+### 정보 확인
 
 ```bash
-# 파일명으로 언어 자동 감지
-python3 mms_tts.py -f scripts/Vietnamese.txt
-python3 mms_tts.py -f scripts/Russian.txt
-python3 mms_tts.py -f scripts/Mongolian.txt
-
-# 언어 코드 직접 지정
-python3 mms_tts.py "Xin chào" --lang vi -o output.wav
-python3 mms_tts.py "Здравствуйте" --lang ru -o output.wav
+.venv/bin/python tts.py --voices   # 목소리 목록
+.venv/bin/python tts.py --langs    # 지원 언어 목록
+.venv/bin/python tts.py --config   # 현재 설정 출력
 ```
 
 ---
 
-## 언어 자동 감지 (mms_tts.py)
+## 설정 (config.yaml)
 
-`--file` 옵션 사용 시 파일명으로 언어 자동 감지:
+```yaml
+supertonic:
+  voice: M2      # F1~F5 (여성), M1~M5 (남성)
+  speed: 1.0     # 발화 속도 (0.5 ~ 2.0)
+  steps: 16      # 품질 단계 (4~16, 높을수록 품질 좋고 느림)
 
-| 파일명 | 감지 언어 |
-|--------|---------|
-| Vietnamese.txt | vi |
-| Russian.txt | ru |
-| Thai.txt | th |
-| Mongolian.txt | mn |
-| Uzbek.txt | uz |
-| Indonesian.txt | id |
-| Tagalog.txt | tl |
+output:
+  directory: output
+```
 
-파일명이 목록에 없으면 `--lang` 옵션 필수.
+CLI 옵션이 config.yaml보다 우선 적용.
 
 ---
 
-## 샘플 스크립트 (`scripts/`)
+## 지원 언어 (31개)
 
-국민건강보험 고객센터 업무 시나리오 기반 다국어 스크립트.
+`ko en ja fr de es it pt ru vi id hi ar tr uk pl nl sv da fi cs sk ro hu hr bg el et lv lt sl`
 
-| 파일 | 내용 |
-|------|------|
-| korean.txt | 보험료 납부 안내 |
-| english.txt | 외국인 건강보험 자격 안내 |
-| chinese.txt | 건강검진 대상 조회 |
-| japanese.txt | 고액요양비 제도 안내 |
-| Vietnamese.txt | 피부양자 등록 안내 |
-| Russian.txt | 의료비 환급 안내 |
-| Thai.txt | 건강검진 안내 |
-| Indonesian.txt | 지역가입자 보험료 안내 |
-| Tagalog.txt | 보험료 납부 안내 |
-| Uzbek.txt | 주소 변경 안내 (키릴 문자) |
-| Mongolian.txt | 주소 변경 안내 |
+**미지원**: `zh` 중국어, `th` 태국어, `tl` 타갈로그어, `uz` 우즈베크어, `mn` 몽골어
 
 ---
 
-## 모델 정보
+## 라이센스
 
-| 모델 | 라이선스 | VRAM | 특징 |
-|------|---------|------|------|
-| Fish Speech 1.5 | Apache 2.0 | ~4GB | 고품질, 음성 복제 지원 |
-| Meta MMS-TTS | CC-BY-NC-4.0 | ~0.3GB/언어 | 1100개 언어, 언어별 개별 모델 |
-
----
-
-## 향후 계획
-
-- [ ] Fish Speech 참조 음성(`--ref-audio`) 활용한 화자 일관성 개선
-- [ ] MMS-TTS 라틴 우즈벡어 지원 (현재 키릴만 가능)
-- [ ] 언어 자동 감지 기반 Fish Speech / MMS-TTS 자동 라우팅
+| 구성 요소 | 라이센스 | 상업 사용 |
+|-----------|---------|---------|
+| Supertonic 코드 | MIT | ✅ |
+| Supertonic 모델 | OpenRAIL-M | ✅ (딥페이크·사칭·불법 용도 제외) |
