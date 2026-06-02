@@ -114,6 +114,7 @@ def cmd_run(args, config: dict):
         voice=args.voice or None,
         speed=args.speed or None,
         steps=args.steps or None,
+        gap=args.gap if args.gap is not None else 0.4,
     )
 
 
@@ -131,6 +132,55 @@ def cmd_langs(args, config: dict):
     print("지원 언어:")
     for lang in sorted(engine.SUPPORTED_LANGS):
         print(f"  {lang}")
+
+
+def cmd_split(args, config: dict):
+    if not args.input:
+        print("[오류] --split 은 --input 과 함께 사용하세요.", file=sys.stderr)
+        sys.exit(1)
+
+    p = Path(args.input)
+    if not p.exists():
+        print(f"[오류] 파일 없음: {args.input}", file=sys.stderr)
+        sys.exit(1)
+
+    lines = [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if not lines:
+        print("[오류] 파일에 텍스트가 없습니다.", file=sys.stderr)
+        sys.exit(1)
+
+    lang = args.lang or detect_lang(p) or "ko"
+    lang = lang.lower()
+
+    out_dir = Path(args.output) if args.output else (
+        Path(cfg(config, "output", "directory", default="output")) / p.stem
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    engine = get_engine(config)
+
+    if not engine.supports(lang):
+        print(f"[오류] 지원하지 않는 언어: {lang}", file=sys.stderr)
+        print(f"  지원 언어: {', '.join(sorted(engine.SUPPORTED_LANGS))}", file=sys.stderr)
+        sys.exit(1)
+
+    total = len(lines)
+    pad = len(str(total))
+    print(f"[split] {total}줄 → {out_dir}/")
+
+    for i, line in enumerate(lines, start=1):
+        out_path = out_dir / f"{i:0{pad}d}.wav"
+        print(f"  [{i}/{total}] {line!r} → {out_path.name}")
+        engine.generate_to_file(
+            text=line,
+            output_path=str(out_path),
+            lang=lang,
+            voice=args.voice or None,
+            speed=args.speed or None,
+            steps=args.steps or None,
+        )
+
+    print(f"[완료] {total}개 파일 생성: {out_dir}/")
 
 
 def cmd_config(args, config: dict):
@@ -151,6 +201,8 @@ def main():
   python tts.py --input scripts/korean.txt
   python tts.py --text "안녕하세요" --lang ko
   python tts.py --text "Hello world" --lang en --voice F3
+  python tts.py --input scripts/sample.txt --split
+  python tts.py --input scripts/sample.txt --split --output output/my_dir
   python tts.py --voices
   python tts.py --langs
   python tts.py --config
@@ -163,6 +215,8 @@ def main():
     parser.add_argument("--voice",  "-v", help="목소리 (F1~F5 / M1~M5)")
     parser.add_argument("--speed",  "-s", type=float, help="발화 속도 (기본: 1.05)")
     parser.add_argument("--steps",        type=int,   help="품질 단계 (기본: 8, 높을수록 느리고 좋음)")
+    parser.add_argument("--gap",    "-g", type=float, help="줄 사이 묵음 (초, 기본: 0.4)")
+    parser.add_argument("--split",         action="store_true", help="줄별 개별 WAV 생성 (--input 필요)")
     parser.add_argument("--voices",       action="store_true", help="목소리 목록")
     parser.add_argument("--langs",        action="store_true", help="지원 언어 목록")
     parser.add_argument("--config",       action="store_true", help="현재 설정 출력")
@@ -175,6 +229,8 @@ def main():
         cmd_langs(args, config)
     elif args.config:
         cmd_config(args, config)
+    elif args.split:
+        cmd_split(args, config)
     else:
         cmd_run(args, config)
 

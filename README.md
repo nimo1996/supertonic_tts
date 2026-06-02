@@ -104,7 +104,7 @@ export SUPERTONIC_CACHE_DIR=/path/to/model
 # 느리게
 .venv/bin/python tts.py --text "안녕하세요" --speed 0.8
 
-# 고품질 (느림, 기본값 16)
+# 고품질 (느림, 기본값 8)
 .venv/bin/python tts.py --input scripts/korean.txt --steps 16
 
 # 빠른 미리보기 (저품질)
@@ -121,14 +121,59 @@ export SUPERTONIC_CACHE_DIR=/path/to/model
 
 ### 멀티라인 파일
 
-줄 단위로 분할해 생성 후 이어붙입니다. 줄 사이에 0.4초 묵음이 삽입됩니다.
+줄 단위로 분할해 생성 후 이어붙입니다. `--gap`으로 줄 사이 묵음 길이를 조절할 수 있습니다 (기본 0.4초).
 
 ```bash
 .venv/bin/python tts.py --input scripts/daily.txt
-# [1/44] 총기상 15분전
-# [2/44] 총기상 5분전
+# [TTS 1/3] 총기상 15분전
+# [TTS 2/3] 총기상 5분전
 # ...
+
+# 줄 사이 간격을 0.8초로 늘리기
+.venv/bin/python tts.py --input scripts/daily.txt --gap 0.8
 ```
+
+### 스크립트 마커 (효과음 / 묵음 삽입)
+
+스크립트 파일에 마커를 사용해 효과음과 묵음을 원하는 위치에 삽입할 수 있습니다.  
+마커는 반드시 **별도 줄**에 작성합니다.
+
+| 마커 | 설명 |
+|------|------|
+| `[BELL: 경로]` | WAV 파일을 해당 위치에 삽입 |
+| `[SFX: 경로]` | `[BELL]`과 동일 (별칭) |
+| `[PAUSE: 초]` | 지정한 시간만큼 묵음 삽입 |
+
+경로는 프로젝트 루트 기준 상대 경로 또는 절대 경로를 사용합니다.
+
+**스크립트 예시 (`scripts/announcement.txt`):**
+
+```text
+[BELL: sounds/bell.wav]
+안녕하세요, 오늘의 안내를 시작합니다.
+[PAUSE: 1.0]
+첫 번째 안내입니다. 잠시 후 두 번째 안내가 이어집니다.
+[PAUSE: 0.5]
+두 번째 안내입니다. 오늘도 좋은 하루 되세요.
+[SFX: sounds/chime.wav]
+감사합니다.
+```
+
+**실행:**
+
+```bash
+.venv/bin/python tts.py --input scripts/announcement.txt --lang ko
+# [BELL bell.wav]
+# [TTS 1/4] 안녕하세요, 오늘의 안내를 시작합니다.
+# [PAUSE 1.0s]
+# [TTS 2/4] 첫 번째 안내입니다...
+# [PAUSE 0.5s]
+# [TTS 3/4] 두 번째 안내입니다...
+# [SFX chime.wav]
+# [TTS 4/4] 감사합니다.
+```
+
+> **주의:** 마커가 포함된 스크립트는 `--split` 옵션과 함께 사용하지 않습니다.
 
 ---
 
@@ -179,7 +224,8 @@ multilingual-tts/
 ├── engines/
 │   ├── supertonic_engine.py   # Supertonic v3 래퍼
 │   └── __init__.py
-├── scripts/                   # 언어별 샘플 텍스트
+├── scripts/                   # 입력 스크립트 (텍스트 + 마커)
+├── sounds/                    # 효과음 WAV 파일
 ├── docs/                      # 상세 문서
 ├── models/                    # (사용 안 함, git 제외)
 └── output/                    # 생성 음성 파일 (git 제외)
