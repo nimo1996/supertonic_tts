@@ -8,3 +8,8 @@ supertonic:
 
 output:
   directory: output  # 출력 폴더
+
+api:
+  host: 0.0.0.0
+  port: 9090
+  output_directory: /home/aicc/supertonic_tts/output

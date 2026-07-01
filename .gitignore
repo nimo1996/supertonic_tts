@@ -7,6 +7,11 @@ models/
 # 생성 음성 파일
 output/
 
+# API runtime
+logs/
+.api.pid
+=1.3.0
+
 # Python
 __pycache__/
 *.pyc

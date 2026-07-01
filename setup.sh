@@ -9,7 +9,7 @@ echo "=== multilingual-tts 설치 ==="
 # venv 생성
 if [ ! -f ".venv/bin/python3" ]; then
     echo "[1/2] 가상환경 생성..."
-    python3 -m venv .venv
+    python3.11 -m venv .venv
 fi
 
 # 패키지 설치
@@ -21,6 +21,6 @@ echo "  완료"
 echo ""
 echo "=== 설치 완료 ==="
 echo "사용법:"
-echo "  .venv/bin/python tts.py --input scripts/korean.txt"
 echo "  .venv/bin/python tts.py --text '안녕하세요' --lang ko"
-echo "  .venv/bin/python tts.py --voices"
+echo "  ./run_api.sh start"
+echo "  ./scripts/call_tts_api.sh -t '안녕하세요' -f greeting"

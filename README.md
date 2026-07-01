@@ -3,6 +3,27 @@
 CPU 우선 상업용 다국어 TTS 시스템.  
 한국어 품질 최우선, GPU 없이 실시간 이상의 속도로 자연스러운 음성 생성.
 
+CLI, HTTP API, 셸 스크립트 세 가지 방식으로 사용할 수 있습니다.
+
+---
+
+## 빠른 시작
+
+```bash
+git clone <repo-url>
+cd supertonic_tts
+bash setup.sh
+
+# CLI
+.venv/bin/python tts.py --text "안녕하세요" --lang ko
+
+# API 서버 (백그라운드)
+./run_api.sh start
+
+# API 요청
+./scripts/call_tts_api.sh -t "안녕하세요" -f greeting -l ko -v M2
+```
+
 ---
 
 ## 엔진: Supertonic v3
@@ -16,14 +37,15 @@ CPU 우선 상업용 다국어 TTS 시스템.
 | 모델 크기 | ~305MB |
 | 출력 품질 | 44,100Hz 16-bit WAV |
 | CPU 속도 | RTF 3~5x (1초 음성을 0.2~0.3초에 생성) |
-| 목소리 | F1~F5 (여성), M1~M5 (남성) — 총 10종 |
+| 목소리 | F1~F5 (여성), M1~M5 (남성) - 총 10종 |
 | 지원 언어 | 31개 |
 
 ---
 
 ## 요구 사항
 
-- Python 3.10 이상
+- Python 3.10 이상 (Rocky Linux 8: `python3.11` 권장)
+- `curl` (API 요청 스크립트 사용 시)
 - 인터넷 연결 (최초 1회 모델 다운로드)
 - 디스크 여유 공간 약 400MB (`~/.cache/supertonic3/` 에 저장)
 
@@ -35,7 +57,7 @@ CPU 우선 상업용 다국어 TTS 시스템.
 
 ```bash
 git clone <repo-url>
-cd multilingual-tts
+cd supertonic_tts
 ```
 
 ### 2. 설치 스크립트 실행
@@ -53,18 +75,17 @@ Python 가상환경(`.venv`)을 생성하고 의존 패키지를 설치합니다
 
 ```bash
 .venv/bin/python tts.py --text "안녕하세요" --lang ko
-# → ~/.cache/supertonic3/ 에 모델 자동 다운로드 후 실행
+# -> ~/.cache/supertonic3/ 에 모델 자동 다운로드 후 실행
 ```
 
 인터넷이 없는 환경을 위해 미리 수동 다운로드도 가능합니다:
 
 ```bash
-# huggingface_hub CLI로 수동 다운로드
 .venv/bin/pip install huggingface_hub
 .venv/bin/huggingface-cli download Supertone/supertonic-3 --local-dir ~/.cache/supertonic3
 ```
 
-또는 캐시 위치를 직접 지정하려면:
+캐시 위치를 직접 지정하려면:
 
 ```bash
 export SUPERTONIC_CACHE_DIR=/path/to/model
@@ -73,7 +94,7 @@ export SUPERTONIC_CACHE_DIR=/path/to/model
 
 ---
 
-## 사용법
+## CLI 사용법
 
 ### 기본
 
@@ -88,27 +109,14 @@ export SUPERTONIC_CACHE_DIR=/path/to/model
 .venv/bin/python tts.py --text "Hello" --lang en --output hello.wav
 ```
 
-### 목소리 변경
+### 목소리 / 속도 / 품질
 
 ```bash
-# 목소리 목록 확인
-.venv/bin/python tts.py --voices
-
-# 특정 목소리 사용
+.venv/bin/python tts.py --voices                          # 목소리 목록
 .venv/bin/python tts.py --text "안녕하세요" --voice F1
-```
-
-### 속도 / 품질 조절
-
-```bash
-# 느리게
-.venv/bin/python tts.py --text "안녕하세요" --speed 0.8
-
-# 고품질 (느림, 기본값 8)
-.venv/bin/python tts.py --input scripts/korean.txt --steps 16
-
-# 빠른 미리보기 (저품질)
-.venv/bin/python tts.py --input scripts/korean.txt --steps 4
+.venv/bin/python tts.py --text "안녕하세요" --speed 0.8    # 느리게
+.venv/bin/python tts.py --input scripts/korean.txt --steps 16   # 고품질
+.venv/bin/python tts.py --input scripts/korean.txt --steps 4     # 빠른 미리보기
 ```
 
 ### 정보 확인
@@ -119,17 +127,21 @@ export SUPERTONIC_CACHE_DIR=/path/to/model
 .venv/bin/python tts.py --config    # 현재 설정 출력
 ```
 
-### 멀티라인 파일
+### 줄별 개별 파일 생성 (`--split`)
+
+입력 파일의 각 줄을 별도 WAV 파일로 저장합니다.
+
+```bash
+.venv/bin/python tts.py --input scripts/sample.txt --split
+.venv/bin/python tts.py --input scripts/sample.txt --split --output output/my_dir
+```
+
+### 멀티라인 파일 (한 파일로 합성)
 
 줄 단위로 분할해 생성 후 이어붙입니다. `--gap`으로 줄 사이 묵음 길이를 조절할 수 있습니다 (기본 0.4초).
 
 ```bash
 .venv/bin/python tts.py --input scripts/daily.txt
-# [TTS 1/3] 총기상 15분전
-# [TTS 2/3] 총기상 5분전
-# ...
-
-# 줄 사이 간격을 0.8초로 늘리기
 .venv/bin/python tts.py --input scripts/daily.txt --gap 0.8
 ```
 
@@ -144,50 +156,110 @@ export SUPERTONIC_CACHE_DIR=/path/to/model
 | `[SFX: 경로]` | `[BELL]`과 동일 (별칭) |
 | `[PAUSE: 초]` | 지정한 시간만큼 묵음 삽입 |
 
-경로는 프로젝트 루트 기준 상대 경로 또는 절대 경로를 사용합니다.
-
 **스크립트 예시 (`scripts/announcement.txt`):**
 
 ```text
 [BELL: sounds/bell.wav]
 안녕하세요, 오늘의 안내를 시작합니다.
 [PAUSE: 1.0]
-첫 번째 안내입니다. 잠시 후 두 번째 안내가 이어집니다.
-[PAUSE: 0.5]
-두 번째 안내입니다. 오늘도 좋은 하루 되세요.
+첫 번째 안내입니다.
 [SFX: sounds/chime.wav]
 감사합니다.
 ```
 
-**실행:**
-
 ```bash
 .venv/bin/python tts.py --input scripts/announcement.txt --lang ko
-# [BELL bell.wav]
-# [TTS 1/4] 안녕하세요, 오늘의 안내를 시작합니다.
-# [PAUSE 1.0s]
-# [TTS 2/4] 첫 번째 안내입니다...
-# [PAUSE 0.5s]
-# [TTS 3/4] 두 번째 안내입니다...
-# [SFX chime.wav]
-# [TTS 4/4] 감사합니다.
 ```
 
 > **주의:** 마커가 포함된 스크립트는 `--split` 옵션과 함께 사용하지 않습니다.
 
 ### 문장 내 간격 조절 (구두점 활용)
 
-`[PAUSE]` 마커는 줄 단위로만 동작합니다. 문장 **안에서** 간격을 조절하려면 구두점을 활용합니다.  
-억양이 자연스럽게 유지되면서 멈춤 길이가 달라집니다.
-
 | 구두점 | 예시 | 추가 간격 |
 |--------|------|----------|
-| 없음 | `이 세상에는 많은 사람이 있다.` | — |
+| 없음 | `이 세상에는 많은 사람이 있다.` | - |
 | `,` | `이 세상에는, 많은 사람이 있다.` | +0.2초 |
 | `...` | `이 세상에는... 많은 사람이 있다.` | +0.8초 |
 | `……` | `이 세상에는…… 많은 사람이 있다.` | +1.2초 |
 
-`...`를 더 붙일수록 간격이 길어집니다. 정밀한 제어보다 자연스러운 호흡감이 필요할 때 유용합니다.
+---
+
+## HTTP API
+
+텍스트를 받아 서버 로컬 디스크에 WAV 파일로 저장하는 REST API입니다.  
+상세 규격은 [`docs/api-spec.md`](docs/api-spec.md) 를 참고하세요.
+
+### 서버 실행
+
+**포그라운드 (직접 실행):**
+
+```bash
+.venv/bin/python api.py
+```
+
+**백그라운드 (권장):**
+
+```bash
+./run_api.sh start      # 시작
+./run_api.sh status     # 상태 확인
+./run_api.sh stop       # 종료
+./run_api.sh restart    # 재시작
+```
+
+- 로그: `logs/api.log`
+- PID 파일: `.api.pid`
+- Swagger UI: `http://127.0.0.1:9090/docs`
+
+### API 요청 스크립트
+
+```bash
+# health 확인
+./scripts/call_tts_api.sh --health
+
+# TTS 요청
+./scripts/call_tts_api.sh -t "안녕하세요" -f greeting
+./scripts/call_tts_api.sh -t "Hello" -f hello_en -l en -v F3 -s 1.05
+```
+
+| 옵션 | 설명 |
+|------|------|
+| `-t, --text` | 합성 텍스트 (필수) |
+| `-f, --filename` | 저장 파일명 (필수, 경로 없이) |
+| `-v, --voice` | 목소리 (F1~F5 / M1~M5) |
+| `-s, --speed` | 속도 (0.5~2.0) |
+| `-l, --lang` | 언어 (기본: ko) |
+| `--host` | API 호스트 (기본: 127.0.0.1) |
+| `-p, --port` | 포트 (기본: config.yaml) |
+| `--health` | 상태 확인만 |
+
+### curl 예시
+
+```bash
+curl -s http://127.0.0.1:9090/api/health
+
+curl -X POST http://127.0.0.1:9090/api/tts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "안녕하세요",
+    "filename": "greeting",
+    "voice": "M2",
+    "speed": 1.0,
+    "lang": "ko"
+  }'
+```
+
+응답 예:
+
+```json
+{
+  "ok": true,
+  "path": "/home/aicc/supertonic_tts/output/greeting.wav",
+  "filename": "greeting.wav"
+}
+```
+
+API는 WAV 바이너리를 HTTP 응답으로 반환하지 않고, 서버 디스크에 저장한 뒤 경로만 반환합니다.  
+동일한 `filename`으로 재요청하면 기존 파일을 덮어씁니다.
 
 ---
 
@@ -195,15 +267,27 @@ export SUPERTONIC_CACHE_DIR=/path/to/model
 
 ```yaml
 supertonic:
-  voice: M2      # F1~F5 (여성), M1~M5 (남성)
-  speed: 1.0     # 발화 속도 (0.5 ~ 2.0)
-  steps: 16      # 품질 단계 (4~16, 높을수록 품질 좋고 느림)
+  voice: M2          # F1~F5 (여성), M1~M5 (남성)
+  speed: 1.0         # 발화 속도 (0.5 ~ 2.0)
+  steps: 16          # 품질 단계 (4~16, 높을수록 느리고 품질 좋음)
 
 output:
-  directory: output
+  directory: output  # CLI 기본 출력 폴더
+
+api:
+  host: 0.0.0.0
+  port: 9090
+  output_directory: output   # API WAV 저장 폴더 (절대/상대 경로 가능)
 ```
 
-CLI 옵션이 config.yaml보다 우선 적용됩니다.
+| 섹션 | 용도 |
+|------|------|
+| `supertonic` | CLI/API 공통 기본 목소리, 속도, 품질 |
+| `output.directory` | CLI `--output` 미지정 시 저장 위치 |
+| `api.host` / `api.port` | HTTP API 바인딩 주소 |
+| `api.output_directory` | API 요청 시 WAV 저장 위치 |
+
+CLI 옵션과 API 요청 본문의 값이 config.yaml보다 우선 적용됩니다.
 
 ---
 
@@ -230,18 +314,22 @@ CLI 옵션이 config.yaml보다 우선 적용됩니다.
 ## 프로젝트 구조
 
 ```
-multilingual-tts/
-├── tts.py                     # 메인 CLI
+supertonic_tts/
+├── tts.py                     # CLI
+├── api.py                     # HTTP API 서버
+├── run_api.sh                 # API 서버 start/stop/status
 ├── config.yaml                # 사용자 설정
 ├── requirements.txt           # 의존 패키지
 ├── setup.sh                   # 설치 스크립트
 ├── engines/
-│   ├── supertonic_engine.py   # Supertonic v3 래퍼
-│   └── __init__.py
-├── scripts/                   # 입력 스크립트 (텍스트 + 마커)
+│   └── supertonic_engine.py   # Supertonic v3 래퍼
+├── scripts/
+│   ├── call_tts_api.sh        # API 요청 스크립트
+│   └── *.txt                  # 입력 스크립트 (텍스트 + 마커)
+├── docs/
+│   └── api-spec.md            # HTTP API 규격서
 ├── sounds/                    # 효과음 WAV 파일
-├── docs/                      # 상세 문서
-├── models/                    # (사용 안 함, git 제외)
+├── logs/                      # API 서버 로그 (git 제외)
 └── output/                    # 생성 음성 파일 (git 제외)
 ```
 
@@ -253,9 +341,9 @@ multilingual-tts/
 
 | 구성 요소 | 라이센스 | 상업 사용 |
 |-----------|---------|---------|
-| 이 프로젝트 코드 | MIT | ✅ |
-| Supertonic 코드 | MIT | ✅ |
-| Supertonic 모델 | OpenRAIL-M | ✅ (딥페이크·사칭·불법 용도 제외) |
+| 이 프로젝트 코드 | MIT | OK |
+| Supertonic 코드 | MIT | OK |
+| Supertonic 모델 | OpenRAIL-M | OK (딥페이크/사칭/불법 용도 제외) |
 
 OpenRAIL-M 주요 제한: 동의 없는 타인 목소리 사칭(딥페이크), 허위정보 생성, 아동 착취 등 오남용 목적 금지.  
 고객센터, 콘텐츠 제작, 서비스 안내 등 정상적인 상업 목적은 제한 없이 사용 가능.
