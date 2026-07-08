@@ -2,10 +2,10 @@
 
 | 항목 | 내용 |
 |------|------|
-| 문서 버전 | 1.0 |
-| 작성일 | 2026-06-24 |
+| 문서 버전 | 1.1 |
+| 작성일 | 2026-07-03 |
 | 프로토콜 | HTTP/1.1 |
-| 데이터 형식 | JSON (요청/응답), WAV (파일 저장) |
+| 데이터 형식 | JSON (요청), JSON 또는 WAV (응답) |
 | 인증 | 없음 |
 | 기본 Base URL | `http://{host}:9090` |
 
@@ -13,7 +13,10 @@
 
 ## 1. 개요
 
-multilingual-tts API는 텍스트를 음성(WAV)으로 변환하고, 서버 로컬 디스크의 지정 디렉터리에 파일로 저장한다.
+multilingual-tts API는 텍스트를 음성(WAV)으로 변환한다. 응답 방식은 두 가지이다.
+
+- **파일 저장 모드** (`POST /api/tts`): 서버 로컬 디스크에 WAV를 저장하고, 저장 경로를 JSON으로 반환
+- **오디오 응답 모드** (`POST /api/tts/audio`): WAV 바이너리를 HTTP 응답 본문으로 직접 반환 (디스크 저장 없음)
 
 - 엔진: Supertonic v3
 - 출력 포맷: 44,100Hz, 16-bit, mono WAV
@@ -21,8 +24,20 @@ multilingual-tts API는 텍스트를 음성(WAV)으로 변환하고, 서버 로�
 
 ### 1.1 서버 실행
 
+배포판(권장, 소스 미포함 실행파일):
+
 ```bash
-cd /home/aicc/supertonic_tts
+./run_api.sh start     # 백그라운드 실행
+./run_api.sh status
+./run_api.sh stop
+```
+
+설치·운영 절차 전체는 [INSTALL.md](INSTALL.md), [OPERATIONS.md](OPERATIONS.md) 참고.
+
+소스 개발 환경에서 직접 실행할 경우:
+
+```bash
+cd supertonic_tts
 .venv/bin/python api.py
 ```
 
@@ -32,21 +47,21 @@ cd /home/aicc/supertonic_tts
 api:
   host: 0.0.0.0
   port: 9090
-  output_directory: /home/aicc/supertonic_tts/output
+  output_directory: output
 ```
 
 | 설정 키 | 기본값 | 설명 |
 |---------|--------|------|
 | `api.host` | `0.0.0.0` | 바인딩 주소 |
 | `api.port` | `9090` | 리스닝 포트 |
-| `api.output_directory` | `output` (상대 경로) | WAV 저장 디렉터리. 상대 경로는 프로젝트 루트 기준 |
+| `api.output_directory` | `output` (상대 경로) | WAV 저장 디렉터리. 상대 경로는 설치 디렉터리(실행파일 위치) 기준 |
 
 ### 1.2 공통 규칙
 
 | 항목 | 규칙 |
 |------|------|
 | Content-Type (요청) | `application/json; charset=utf-8` |
-| Content-Type (응답) | `application/json; charset=utf-8` |
+| Content-Type (응답) | 엔드포인트별 상이 (아래 참고) |
 | 문자 인코딩 | UTF-8 |
 | HTTP 메서드 | 명세에 정의된 메서드만 사용 |
 
@@ -54,10 +69,11 @@ api:
 
 ## 2. 엔드포인트 목록
 
-| No | 메서드 | 경로 | 설명 |
-|----|--------|------|------|
-| 1 | GET | `/api/health` | 서버 상태 및 출력 디렉터리 확인 |
-| 2 | POST | `/api/tts` | 텍스트 합성 후 WAV 파일 저장 |
+| No | 메서드 | 경로 | 설명 | 응답 형식 |
+|----|--------|------|------|-----------|
+| 1 | GET | `/api/health` | 서버 상태 및 출력 디렉터리 확인 | JSON |
+| 2 | POST | `/api/tts` | 텍스트 합성 후 WAV 파일 저장 | JSON |
+| 3 | POST | `/api/tts/audio` | 텍스트 합성 후 WAV 바이너리 반환 | WAV |
 
 ---
 
@@ -100,9 +116,9 @@ curl -s http://127.0.0.1:9090/api/health
 
 ---
 
-### 3.2 텍스트 음성 합성 (TTS)
+### 3.2 텍스트 음성 합성 - 파일 저장 (`/api/tts`)
 
-텍스트를 음성으로 변환하고, 서버의 출력 디렉터리에 WAV 파일로 저장한다.
+텍스트를 음성으로 변환하고, 서버의 출력 디렉터리에 WAV 파일로 저장한다. 저장 경로를 JSON으로 반환한다.
 
 #### 요청
 
@@ -173,6 +189,7 @@ Content-Type: application/json
 
 | HTTP 상태 | 200 OK |
 |-----------|--------|
+| Content-Type | `application/json` |
 
 ```json
 {
@@ -189,25 +206,6 @@ Content-Type: application/json
 | `filename` | string | 저장된 파일명 (확장자 포함) |
 
 동일한 `filename`으로 재요청하면 기존 파일을 덮어쓴다.
-
-#### 오류 응답
-
-FastAPI 기본 오류 형식:
-
-```json
-{
-  "detail": "오류 메시지"
-}
-```
-
-| HTTP 상태 | 발생 조건 | `detail` 예시 |
-|-----------|-----------|---------------|
-| 400 | `filename` 형식 오류 | `"filename must contain only letters, digits, dot, underscore, or hyphen"` |
-| 400 | 지원하지 않는 언어 | `"unsupported lang: zh"` |
-| 400 | 잘못된 목소리 | `"unknown voice: X9"` |
-| 400 | 기타 입력 검증 실패 | `"잘못된 목소리: X9. 선택 가능: [...]"` |
-| 422 | JSON 스키마 오류 (필수 필드 누락 등) | Pydantic 검증 메시지 |
-| 500 | 합성 중 서버 내부 오류 | `"synthesis failed: ..."` |
 
 #### cURL 예시
 
@@ -246,7 +244,141 @@ print(result["path"])
 
 ---
 
+### 3.3 텍스트 음성 합성 - 오디오 응답 (`/api/tts/audio`)
+
+텍스트를 음성으로 변환하고, WAV 바이너리를 HTTP 응답 본문으로 직접 반환한다. 서버 디스크에는 저장하지 않는다.
+
+#### 요청
+
+```
+POST /api/tts/audio
+Content-Type: application/json
+```
+
+#### 요청 본문 (JSON)
+
+```json
+{
+  "text": "안녕하세요, 오늘의 안내를 시작합니다.",
+  "voice": "M2",
+  "speed": 1.0,
+  "lang": "ko",
+  "filename": "greeting"
+}
+```
+
+| 필드 | 타입 | 필수 | 기본값 | 설명 |
+|------|------|------|--------|------|
+| `text` | string | O | - | 합성할 텍스트. 1자 이상 |
+| `voice` | string | X | `config.yaml`의 `supertonic.voice` | 목소리 ID. 대소문자 무관 (`m2` -> `M2`) |
+| `speed` | number (float) | X | `config.yaml`의 `supertonic.speed` | 발화 속도. 범위: 0.5 ~ 2.0 |
+| `lang` | string | X | `"ko"` | 언어 코드 (소문자) |
+| `filename` | string | X | `"tts.wav"` | `Content-Disposition` 헤더에 사용할 파일명. 3.2절 `filename` 규칙 동일 적용 |
+
+`voice`, `lang` 값은 3.2절과 동일하다.
+
+#### `filename` vs 클라이언트 저장 경로
+
+| 항목 | 위치 | 역할 |
+|------|------|------|
+| JSON `filename` | 서버 | 응답 헤더 `Content-Disposition: attachment; filename="..."` 에 사용. 브라우저 등이 다운로드 시 제안하는 파일명 |
+| curl `-o` / 클라이언트 저장 경로 | 클라이언트 | 실제로 파일을 저장할 로컬 경로. curl 사용 시 `-o`가 저장 위치를 결정하며, JSON `filename`과 독립적 |
+
+예: `-d '{"filename":"greeting"}' -o my_voice.wav` 이면 헤더는 `greeting.wav`, 실제 저장 파일은 `my_voice.wav`이다.
+
+#### 성공 응답
+
+| HTTP 상태 | 200 OK |
+|-----------|--------|
+| Content-Type | `audio/wav` |
+| 응답 본문 | WAV 바이너리 (44,100Hz, 16-bit, mono) |
+
+응답 헤더 예:
+
+```
+Content-Type: audio/wav
+Content-Disposition: attachment; filename="greeting.wav"
+```
+
+#### cURL 예시
+
+```bash
+curl -X POST http://127.0.0.1:9090/api/tts/audio \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "안녕하세요",
+    "voice": "M2",
+    "speed": 1.0,
+    "lang": "ko",
+    "filename": "greeting"
+  }' \
+  -o greeting.wav
+```
+
+`filename`을 생략하면 `Content-Disposition` 기본값은 `tts.wav`이다.
+
+```bash
+curl -X POST http://127.0.0.1:9090/api/tts/audio \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "안녕하세요", "lang": "ko"}' \
+  -o output.wav
+```
+
+#### Python 예시
+
+```python
+import requests
+
+resp = requests.post(
+    "http://127.0.0.1:9090/api/tts/audio",
+    json={
+        "text": "Hello world",
+        "voice": "F3",
+        "speed": 1.05,
+        "lang": "en",
+        "filename": "hello_en",
+    },
+    timeout=120,
+)
+resp.raise_for_status()
+with open("hello_en.wav", "wb") as f:
+    f.write(resp.content)
+```
+
+#### 스크립트 예시
+
+```bash
+./scripts/call_tts_api.sh -t "안녕하세요" --audio greeting.wav -v M2
+```
+
+---
+
+### 3.4 공통 오류 응답
+
+TTS 엔드포인트(`/api/tts`, `/api/tts/audio`)에서 발생하는 오류는 FastAPI 기본 형식을 따른다.
+
+```json
+{
+  "detail": "오류 메시지"
+}
+```
+
+| HTTP 상태 | 발생 조건 | `detail` 예시 |
+|-----------|-----------|---------------|
+| 400 | `filename` 형식 오류 | `"filename must contain only letters, digits, dot, underscore, or hyphen"` |
+| 400 | 지원하지 않는 언어 | `"unsupported lang: zh"` |
+| 400 | 잘못된 목소리 | `"unknown voice: X9"` |
+| 400 | 기타 입력 검증 실패 | `"잘못된 목소리: X9. 선택 가능: [...]"` |
+| 422 | JSON 스키마 오류 (필수 필드 누락 등) | Pydantic 검증 메시지 |
+| 500 | 합성 중 서버 내부 오류 | `"synthesis failed: ..."` |
+
+오류 시 응답 Content-Type은 `application/json`이다.
+
+---
+
 ## 4. 처리 흐름
+
+### 4.1 파일 저장 모드 (`/api/tts`)
 
 ```
 Client                    API Server                     Disk
@@ -268,6 +400,29 @@ Client                    API Server                     Disk
 3. 텍스트를 합성하여 `api.output_directory` 아래에 WAV로 저장한다.
 4. 저장 경로와 파일명을 JSON으로 반환한다.
 
+### 4.2 오디오 응답 모드 (`/api/tts/audio`)
+
+```
+Client                    API Server
+  |                          |
+  |  POST /api/tts/audio     |
+  |  {text, voice, ...}      |
+  |------------------------->|
+  |                          |  입력 검증 (lang, voice, filename)
+  |                          |  TTS 합성 (Supertonic v3)
+  |                          |  WAV 바이너리 생성 (메모리)
+  |                          |
+  |  200 audio/wav (binary)  |
+  |<-------------------------|
+  |                          |
+  |  클라이언트가 로컬 저장   |
+```
+
+1. 요청 수신 후 `lang`, `voice`, `filename`(선택)을 검증한다.
+2. 텍스트를 합성하여 메모리상 WAV 바이너리를 생성한다.
+3. `Content-Type: audio/wav` 와 `Content-Disposition` 헤더와 함께 응답 본문으로 반환한다.
+4. 서버 디스크에는 파일을 저장하지 않는다.
+
 ---
 
 ## 5. 제약 및 참고 사항
@@ -275,7 +430,7 @@ Client                    API Server                     Disk
 | 항목 | 내용 |
 |------|------|
 | 인증 | API 키, 토큰 등 인증 없음. 외부 노출 시 방화벽/리버스 프록시로 접근 제어 권장 |
-| 파일 접근 | API는 WAV 바이너리를 HTTP 응답으로 반환하지 않음. 저장 경로만 반환 |
+| 응답 방식 | `/api/tts`는 JSON(저장 경로), `/api/tts/audio`는 WAV 바이너리. 용도에 맞게 선택 |
 | 응답 시간 | 텍스트 길이에 비례. 짧은 문장 기준 수 초 이내 (CPU RTF 3~5x) |
 | 타임아웃 | 클라이언트는 긴 문장 합성 시 60~120초 이상 타임아웃 설정 권장 |
 | 멀티라인 | API는 단일 `text` 문자열을 한 번에 합성. 줄바꿈(`\n`) 포함 시 엔진의 멀티라인 처리 규칙 적용 |
@@ -287,4 +442,5 @@ Client                    API Server                     Disk
 
 | 버전 | 일자 | 변경 내용 |
 |------|------|-----------|
+| 1.1 | 2026-07-03 | `/api/tts/audio` 추가 (WAV 바이너리 직접 응답) |
 | 1.0 | 2026-06-24 | 최초 작성 (`/api/health`, `/api/tts`) |

@@ -53,6 +53,11 @@ bash setup.sh
 
 ## 설치
 
+> 소스 코드를 노출하지 않고 배포하려면(운영 서버 등), `bash build.sh`로 소스 없이 컴파일된 실행파일
+> 패키지(`dist/supertonic-tts-*.tar.gz`)를 만들 수 있습니다. 설치·운영은
+> [docs/INSTALL.md](docs/INSTALL.md), [docs/OPERATIONS.md](docs/OPERATIONS.md) 참고. 아래는 소스에서
+> 직접 개발/실행하는 방법입니다.
+
 ### 1. 저장소 클론
 
 ```bash

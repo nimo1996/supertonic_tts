@@ -8,11 +8,13 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from paths import base_dir
 from tts import CONFIG_PATH, cfg, get_engine, load_config
 
-PROJECT_ROOT = Path(__file__).parent
+PROJECT_ROOT = base_dir()
 SAFE_FILENAME_RE = re.compile(r"^[a-zA-Z0-9._-]+$")
 
 config = load_config()
@@ -46,6 +48,17 @@ class TTSRequest(BaseModel):
     lang: str = Field("ko", description="Language code")
 
 
+class TTSAudioRequest(BaseModel):
+    text: str = Field(..., min_length=1, description="Text to synthesize")
+    voice: str | None = Field(None, description="Voice id (F1~F5 / M1~M5)")
+    speed: float | None = Field(None, ge=0.5, le=2.0, description="Speech speed")
+    lang: str = Field("ko", description="Language code")
+    filename: str | None = Field(
+        None,
+        description="Optional filename for Content-Disposition header",
+    )
+
+
 class TTSResponse(BaseModel):
     ok: bool = True
     path: str
@@ -69,18 +82,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="multilingual-tts API", lifespan=lifespan)
 
 
-@app.get("/api/health", response_model=HealthResponse)
-def health():
-    return HealthResponse(output_directory=str(resolve_output_dir(config)))
-
-
-@app.post("/api/tts", response_model=TTSResponse)
-def synthesize(req: TTSRequest):
-    try:
-        wav_name = sanitize_filename(req.filename)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
+def _resolve_tts_params(req: TTSRequest | TTSAudioRequest):
     engine = _engine or get_engine(config)
     lang = req.lang.lower()
 
@@ -96,6 +98,23 @@ def synthesize(req: TTSRequest):
             status_code=400,
             detail=f"unknown voice: {voice}",
         )
+
+    return engine, lang, voice
+
+
+@app.get("/api/health", response_model=HealthResponse)
+def health():
+    return HealthResponse(output_directory=str(resolve_output_dir(config)))
+
+
+@app.post("/api/tts", response_model=TTSResponse)
+def synthesize(req: TTSRequest):
+    try:
+        wav_name = sanitize_filename(req.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    engine, lang, voice = _resolve_tts_params(req)
 
     out_dir = resolve_output_dir(config)
     out_path = out_dir / wav_name
@@ -117,6 +136,38 @@ def synthesize(req: TTSRequest):
     return TTSResponse(path=str(out_path), filename=wav_name)
 
 
+@app.post("/api/tts/audio")
+def synthesize_audio(req: TTSAudioRequest):
+    engine, lang, voice = _resolve_tts_params(req)
+
+    disp_name = "tts.wav"
+    if req.filename:
+        try:
+            disp_name = sanitize_filename(req.filename)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        wav_bytes, _ = engine.generate_to_bytes(
+            text=req.text,
+            lang=lang,
+            voice=voice,
+            speed=req.speed,
+            verbose=False,
+            sfx_base=PROJECT_ROOT,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"synthesis failed: {exc}") from exc
+
+    return Response(
+        content=wav_bytes,
+        media_type="audio/wav",
+        headers={"Content-Disposition": f'attachment; filename="{disp_name}"'},
+    )
+
+
 def main():
     host = cfg(config, "api", "host", default="0.0.0.0")
     port = cfg(config, "api", "port", default=9090)
@@ -126,7 +177,7 @@ def main():
     print(f"  config: {CONFIG_PATH}")
 
     uvicorn.run(
-        "api:app",
+        app,
         host=host,
         port=int(port),
         reload=False,

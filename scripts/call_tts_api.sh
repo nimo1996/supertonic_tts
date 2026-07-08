@@ -4,8 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-PYTHON="${SCRIPT_DIR}/.venv/bin/python"
-
 HOST="127.0.0.1"
 PORT=""
 TEXT=""
@@ -14,6 +12,8 @@ VOICE=""
 SPEED=""
 LANG="ko"
 HEALTH_ONLY=0
+AUDIO_ONLY=0
+OUTPUT_FILE=""
 
 usage() {
     cat <<EOF
@@ -23,7 +23,12 @@ Send a TTS request to the multilingual-tts API.
 
 Required:
   -t, --text TEXT           Text to synthesize
+
+For file-save mode (default):
   -f, --filename NAME       Output WAV filename (without path)
+
+For audio response mode:
+  -a, --audio [FILE]        Return WAV in HTTP response (optional output file)
 
 Optional:
   -v, --voice VOICE         Voice id (F1~F5 / M1~M5)
@@ -37,26 +42,28 @@ Optional:
 Examples:
   $(basename "$0") -t "안녕하세요" -f greeting
   $(basename "$0") -t "Hello" -f hello_en -l en -v F3 -s 1.05
+  $(basename "$0") -t "안녕하세요" --audio greeting.wav
   $(basename "$0") --health
 EOF
 }
 
 read_port_from_config() {
-    if [ ! -x "$PYTHON" ]; then
-        echo "9090"
-        return
+    local cfg="config.yaml"
+    local port=""
+    if [ -f "$cfg" ]; then
+        port="$(sed -n '/^api:/,/^[^[:space:]]/{/port:/{s/.*port:[[:space:]]*\([0-9]\+\).*/\1/p}}' "$cfg" | head -1)"
     fi
-    "$PYTHON" - <<'PY'
-import yaml
-from pathlib import Path
+    echo "${port:-9090}"
+}
 
-cfg_path = Path("config.yaml")
-port = 9090
-if cfg_path.exists():
-    data = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
-    port = int((data.get("api") or {}).get("port", port))
-print(port)
-PY
+json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
 }
 
 while [ $# -gt 0 ]; do
@@ -69,6 +76,15 @@ while [ $# -gt 0 ]; do
         --host) HOST="$2"; shift 2 ;;
         -p|--port) PORT="$2"; shift 2 ;;
         --health) HEALTH_ONLY=1; shift ;;
+        -a|--audio)
+            AUDIO_ONLY=1
+            if [ $# -gt 1 ] && [[ "$2" != -* ]]; then
+                OUTPUT_FILE="$2"
+                shift 2
+            else
+                shift
+            fi
+            ;;
         -h|--help) usage; exit 0 ;;
         *)
             echo "[error] unknown option: $1" >&2
@@ -91,8 +107,14 @@ if [ "$HEALTH_ONLY" -eq 1 ]; then
     exit 0
 fi
 
-if [ -z "$TEXT" ] || [ -z "$FILENAME" ]; then
-    echo "[error] --text and --filename are required" >&2
+if [ -z "$TEXT" ]; then
+    echo "[error] --text is required" >&2
+    usage
+    exit 1
+fi
+
+if [ "$AUDIO_ONLY" -eq 0 ] && [ -z "$FILENAME" ]; then
+    echo "[error] --filename is required unless --audio is used" >&2
     usage
     exit 1
 fi
@@ -102,29 +124,39 @@ if ! command -v curl >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ ! -x "$PYTHON" ]; then
-    echo "[error] venv not found. run: bash setup.sh" >&2
-    exit 1
+JSON="{\"text\":\"$(json_escape "$TEXT")\",\"lang\":\"$(json_escape "$LANG")\""
+[ -n "$VOICE" ] && JSON+=",\"voice\":\"$(json_escape "$VOICE")\""
+[ -n "$SPEED" ] && JSON+=",\"speed\":$SPEED"
+[ -n "$FILENAME" ] && JSON+=",\"filename\":\"$(json_escape "$FILENAME")\""
+JSON+="}"
+
+if [ "$AUDIO_ONLY" -eq 1 ]; then
+    if [ -z "$OUTPUT_FILE" ]; then
+        if [ -n "$FILENAME" ]; then
+            OUTPUT_FILE="${FILENAME%.wav}.wav"
+        else
+            OUTPUT_FILE="tts.wav"
+        fi
+    fi
+
+    echo "[POST] ${BASE_URL}/api/tts/audio"
+    echo "       ${JSON}"
+
+    HTTP_CODE="$(curl -sS -w "%{http_code}" -o "$OUTPUT_FILE" \
+        -X POST "${BASE_URL}/api/tts/audio" \
+        -H "Content-Type: application/json; charset=utf-8" \
+        -d "$JSON")"
+
+    echo "HTTP ${HTTP_CODE}"
+    if [ "$HTTP_CODE" = "200" ]; then
+        echo "saved: ${OUTPUT_FILE}"
+    else
+        cat "$OUTPUT_FILE"
+        echo
+        exit 1
+    fi
+    exit 0
 fi
-
-JSON="$("$PYTHON" - <<PY
-import json
-
-payload = {
-    "text": ${TEXT@Q},
-    "filename": ${FILENAME@Q},
-    "lang": ${LANG@Q},
-}
-voice = ${VOICE@Q}
-speed = ${SPEED@Q}
-if voice:
-    payload["voice"] = voice
-if speed:
-    payload["speed"] = float(speed)
-
-print(json.dumps(payload, ensure_ascii=False))
-PY
-)"
 
 echo "[POST] ${BASE_URL}/api/tts"
 echo "       ${JSON}"

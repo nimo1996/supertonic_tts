@@ -9,7 +9,10 @@ from pathlib import Path
 
 import yaml
 
-CONFIG_PATH = Path(__file__).parent / "config.yaml"
+from paths import base_dir
+
+BASE_DIR = base_dir()
+CONFIG_PATH = BASE_DIR / "config.yaml"
 
 _engine = None
 
@@ -94,7 +97,7 @@ def cmd_run(args, config: dict):
     if args.output:
         out_path = Path(args.output)
     else:
-        out_dir = Path(cfg(config, "output", "directory", default="output"))
+        out_dir = BASE_DIR / cfg(config, "output", "directory", default="output")
         out_dir.mkdir(exist_ok=True)
         out_path = out_dir / f"{input_name}_{lang}.wav"
 
@@ -153,7 +156,7 @@ def cmd_split(args, config: dict):
     lang = lang.lower()
 
     out_dir = Path(args.output) if args.output else (
-        Path(cfg(config, "output", "directory", default="output")) / p.stem
+        BASE_DIR / cfg(config, "output", "directory", default="output") / p.stem
     )
     out_dir.mkdir(parents=True, exist_ok=True)
 

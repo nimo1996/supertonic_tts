@@ -1,3 +1,4 @@
+import io
 import re
 import time
 from pathlib import Path
@@ -65,17 +66,18 @@ class SupertonicEngine:
         # shape: (1, samples) → (samples,)
         return wav.squeeze(0), self._tts.sample_rate
 
-    def generate_to_file(
+    def _synthesize_full_wav(
         self,
         text: str,
-        output_path: str,
         lang: str = "ko",
         voice: str | None = None,
         speed: float | None = None,
         steps: int | None = None,
         gap: float = 0.4,
         verbose: bool = True,
-    ) -> float:
+        sfx_base: Path | None = None,
+        output_path: str | None = None,
+    ) -> tuple[np.ndarray, int, float]:
         lines = [l for l in text.splitlines() if l.strip()]
         if not lines:
             lines = [text]
@@ -105,7 +107,13 @@ class SupertonicEngine:
                 else:  # BELL / SFX
                     sfx_path = Path(value)
                     if not sfx_path.is_absolute():
-                        sfx_path = Path(output_path).parent.parent / value
+                        if sfx_base is not None:
+                            base = sfx_base
+                        elif output_path is not None:
+                            base = Path(output_path).parent.parent
+                        else:
+                            base = Path.cwd()
+                        sfx_path = base / value
                     if not sfx_path.exists():
                         print(f"  [경고] 파일 없음: {sfx_path} — 건너뜀", flush=True)
                         continue
@@ -126,6 +134,29 @@ class SupertonicEngine:
 
         full_wav = np.concatenate(chunks)
         elapsed = time.time() - t0
+        return full_wav, sr, elapsed
+
+    def generate_to_file(
+        self,
+        text: str,
+        output_path: str,
+        lang: str = "ko",
+        voice: str | None = None,
+        speed: float | None = None,
+        steps: int | None = None,
+        gap: float = 0.4,
+        verbose: bool = True,
+    ) -> float:
+        full_wav, sr, elapsed = self._synthesize_full_wav(
+            text=text,
+            lang=lang,
+            voice=voice,
+            speed=speed,
+            steps=steps,
+            gap=gap,
+            verbose=verbose,
+            output_path=output_path,
+        )
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         self._tts.save_audio(full_wav[np.newaxis, :], output_path)
@@ -134,6 +165,32 @@ class SupertonicEngine:
             audio_dur = len(full_wav) / sr
             print(f"  생성: {elapsed:.1f}s | 음성: {audio_dur:.1f}s | RTF: {audio_dur/elapsed:.2f}x | {output_path}")
         return elapsed
+
+    def generate_to_bytes(
+        self,
+        text: str,
+        lang: str = "ko",
+        voice: str | None = None,
+        speed: float | None = None,
+        steps: int | None = None,
+        gap: float = 0.4,
+        verbose: bool = False,
+        sfx_base: Path | None = None,
+    ) -> tuple[bytes, float]:
+        full_wav, sr, elapsed = self._synthesize_full_wav(
+            text=text,
+            lang=lang,
+            voice=voice,
+            speed=speed,
+            steps=steps,
+            gap=gap,
+            verbose=verbose,
+            sfx_base=sfx_base,
+        )
+
+        buf = io.BytesIO()
+        sf.write(buf, full_wav, sr, format="WAV", subtype="PCM_16")
+        return buf.getvalue(), elapsed
 
     def get_voices(self) -> list[str]:
         return VOICES

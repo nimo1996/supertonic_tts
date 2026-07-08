@@ -7,8 +7,17 @@ cd "$SCRIPT_DIR"
 PID_FILE="$SCRIPT_DIR/.api.pid"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/api.log"
-PYTHON="$SCRIPT_DIR/.venv/bin/python"
-API_SCRIPT="$SCRIPT_DIR/api.py"
+
+# 패키지 배포판(supertonic-api 실행파일)이 있으면 그것을 쓰고,
+# 없으면(소스 개발 환경) venv + api.py 로 폴백한다.
+API_BIN="$SCRIPT_DIR/supertonic-api"
+if [ -x "$API_BIN" ]; then
+    START_CMD=("$API_BIN")
+    PROC_MATCH="supertonic-api"
+else
+    START_CMD=("$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/api.py")
+    PROC_MATCH="api.py"
+fi
 
 usage() {
     cat <<EOF
@@ -25,17 +34,12 @@ EOF
 }
 
 read_port() {
-    "$PYTHON" - <<'PY'
-import yaml
-from pathlib import Path
-
-cfg_path = Path("config.yaml")
-port = 9090
-if cfg_path.exists():
-    data = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
-    port = int((data.get("api") or {}).get("port", port))
-print(port)
-PY
+    local cfg="$SCRIPT_DIR/config.yaml"
+    local port=""
+    if [ -f "$cfg" ]; then
+        port="$(sed -n '/^api:/,/^[^[:space:]]/{/port:/{s/.*port:[[:space:]]*\([0-9]\+\).*/\1/p}}' "$cfg" | head -1)"
+    fi
+    echo "${port:-9090}"
 }
 
 get_port_pid() {
@@ -65,7 +69,7 @@ is_our_api_pid() {
 
     local cmdline cwd
     cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline")"
-    [[ "$cmdline" == *"api.py"* ]] || return 1
+    [[ "$cmdline" == *"$PROC_MATCH"* ]] || return 1
 
     if [[ "$cmdline" == *"$SCRIPT_DIR"* ]]; then
         return 0
@@ -131,12 +135,10 @@ stop_pid() {
 }
 
 cmd_start() {
-    if [ ! -x "$PYTHON" ]; then
-        echo "[error] venv not found. run: bash setup.sh" >&2
-        exit 1
-    fi
-    if [ ! -f "$API_SCRIPT" ]; then
-        echo "[error] api.py not found: $API_SCRIPT" >&2
+    if [ ! -x "$API_BIN" ] && [ ! -x "$SCRIPT_DIR/.venv/bin/python" ]; then
+        echo "[error] supertonic-api 실행파일도 없고 .venv 도 없습니다." >&2
+        echo "        배포판이면 supertonic-api 실행파일이 있어야 하고," >&2
+        echo "        소스 개발환경이면 'bash setup.sh' 를 먼저 실행하세요." >&2
         exit 1
     fi
 
@@ -157,7 +159,7 @@ cmd_start() {
 
     mkdir -p "$LOG_DIR"
 
-    nohup "$PYTHON" "$API_SCRIPT" >>"$LOG_FILE" 2>&1 &
+    nohup "${START_CMD[@]}" >>"$LOG_FILE" 2>&1 &
     local pid=$!
     echo "$pid" >"$PID_FILE"
     sleep 1
