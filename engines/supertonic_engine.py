@@ -28,18 +28,22 @@ def _resolve_path(value: str, sfx_base: Path | None, output_path: str | None) ->
     return base / value
 
 
+def _resample(data: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
+    if orig_sr == target_sr:
+        return data
+    new_len = int(len(data) / orig_sr * target_sr)
+    return np.interp(
+        np.linspace(0, len(data) - 1, new_len),
+        np.arange(len(data)),
+        data,
+    ).astype(np.float32)
+
+
 def _load_sfx(path: str, target_sr: int) -> np.ndarray:
     data, sr = sf.read(path, dtype="float32")
     if data.ndim > 1:
         data = data.mean(axis=1)
-    if sr != target_sr:
-        new_len = int(len(data) / sr * target_sr)
-        data = np.interp(
-            np.linspace(0, len(data) - 1, new_len),
-            np.arange(len(data)),
-            data,
-        ).astype(np.float32)
-    return data
+    return _resample(data, sr, target_sr)
 
 
 class SupertonicEngine:
@@ -55,6 +59,7 @@ class SupertonicEngine:
         speed: float = 1.05,
         steps: int = 8,
         sfx_aliases: dict[str, str] | None = None,
+        sample_rate: int | None = None,
     ):
         from supertonic import TTS
         self._tts = TTS(auto_download=True)
@@ -62,6 +67,8 @@ class SupertonicEngine:
         self.speed = speed
         self.steps = steps
         self.sfx_aliases = sfx_aliases or {}
+        # None이면 모델 기본 sample rate(self._tts.sample_rate) 그대로 사용
+        self.sample_rate = sample_rate
 
     def supports(self, lang: str) -> bool:
         return lang.lower() in self.SUPPORTED_LANGS
@@ -177,8 +184,11 @@ class SupertonicEngine:
                 chunks.append(gap_silence)
 
         full_wav = np.concatenate(chunks)
+        out_sr = self.sample_rate or sr
+        if out_sr != sr:
+            full_wav = _resample(full_wav, sr, out_sr)
         elapsed = time.time() - t0
-        return full_wav, sr, elapsed
+        return full_wav, out_sr, elapsed
 
     def generate_to_file(
         self,
@@ -205,7 +215,9 @@ class SupertonicEngine:
         )
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        self._tts.save_audio(full_wav[np.newaxis, :], output_path)
+        # TTS.save_audio()는 self._tts.sample_rate를 무시하고 항상 모델 기본
+        # sample rate로 저장하므로, sample_rate 설정을 반영하려면 직접 써야 함.
+        sf.write(output_path, full_wav, sr, subtype="PCM_16")
 
         if verbose:
             audio_dur = len(full_wav) / sr

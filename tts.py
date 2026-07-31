@@ -48,6 +48,7 @@ def get_engine(config: dict):
             speed=cfg(config, "supertonic", "speed", default=1.05),
             steps=cfg(config, "supertonic", "steps", default=8),
             sfx_aliases=cfg(config, "sfx", default={}) or {},
+            sample_rate=cfg(config, "supertonic", "sample_rate", default=None),
         )
     return _engine
 
