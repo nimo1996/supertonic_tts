@@ -9,7 +9,7 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from paths import base_dir
 from tts import CONFIG_PATH, cfg, get_engine, load_config
@@ -41,6 +41,8 @@ def sanitize_filename(name: str) -> str:
 
 
 class TTSRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     text: str = Field(..., min_length=1, description="Text to synthesize")
     filename: str = Field(..., min_length=1, description="Output WAV filename (without path)")
     voice: str | None = Field(None, description="Voice id (F1~F5 / M1~M5)")
@@ -49,15 +51,31 @@ class TTSRequest(BaseModel):
     gap: float | None = Field(
         None, ge=0.0, le=5.0, description="Silence between lines/segments in seconds (default 0.4)"
     )
+    sound_effect: int | None = Field(
+        None,
+        alias="soundEffect",
+        ge=0,
+        le=5,
+        description="0: none, 1~5: number of bell wav repeats prepended before the TTS audio",
+    )
 
 
 class TTSAudioRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     text: str = Field(..., min_length=1, description="Text to synthesize")
     voice: str | None = Field(None, description="Voice id (F1~F5 / M1~M5)")
     speed: float | None = Field(None, ge=0.5, le=2.0, description="Speech speed")
     lang: str = Field("ko", description="Language code")
     gap: float | None = Field(
         None, ge=0.0, le=5.0, description="Silence between lines/segments in seconds (default 0.4)"
+    )
+    sound_effect: int | None = Field(
+        None,
+        alias="soundEffect",
+        ge=0,
+        le=5,
+        description="0: none, 1~5: number of bell wav repeats prepended before the TTS audio",
     )
     filename: str | None = Field(
         None,
@@ -135,6 +153,7 @@ def synthesize(req: TTSRequest):
             gap=req.gap if req.gap is not None else 0.4,
             verbose=False,
             sfx_base=PROJECT_ROOT,
+            sound_effect=req.sound_effect or 0,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -164,6 +183,7 @@ def synthesize_audio(req: TTSAudioRequest):
             gap=req.gap if req.gap is not None else 0.4,
             verbose=False,
             sfx_base=PROJECT_ROOT,
+            sound_effect=req.sound_effect or 0,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

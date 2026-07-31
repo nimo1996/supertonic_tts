@@ -11,6 +11,7 @@ FILENAME=""
 VOICE=""
 SPEED=""
 GAP=""
+SOUND_EFFECT=""
 LANG="ko"
 HEALTH_ONLY=0
 AUDIO_ONLY=0
@@ -35,6 +36,7 @@ Optional:
   -v, --voice VOICE         Voice id (F1~F5 / M1~M5)
   -s, --speed SPEED         Speech speed (0.5 ~ 2.0)
   -g, --gap GAP             Silence between lines/segments in seconds (default 0.4)
+  -e, --sound-effect N      Bell wav repeats prepended before tts audio (0~5, default 0)
   -l, --lang LANG           Language code (default: ko)
       --host HOST           API host (default: 127.0.0.1)
   -p, --port PORT           API port (default: config.yaml api.port)
@@ -75,6 +77,7 @@ while [ $# -gt 0 ]; do
         -v|--voice) VOICE="$2"; shift 2 ;;
         -s|--speed) SPEED="$2"; shift 2 ;;
         -g|--gap) GAP="$2"; shift 2 ;;
+        -e|--sound-effect) SOUND_EFFECT="$2"; shift 2 ;;
         -l|--lang) LANG="$2"; shift 2 ;;
         --host) HOST="$2"; shift 2 ;;
         -p|--port) PORT="$2"; shift 2 ;;
@@ -131,6 +134,7 @@ JSON="{\"text\":\"$(json_escape "$TEXT")\",\"lang\":\"$(json_escape "$LANG")\""
 [ -n "$VOICE" ] && JSON+=",\"voice\":\"$(json_escape "$VOICE")\""
 [ -n "$SPEED" ] && JSON+=",\"speed\":$SPEED"
 [ -n "$GAP" ] && JSON+=",\"gap\":$GAP"
+[ -n "$SOUND_EFFECT" ] && JSON+=",\"soundEffect\":$SOUND_EFFECT"
 [ -n "$FILENAME" ] && JSON+=",\"filename\":\"$(json_escape "$FILENAME")\""
 JSON+="}"
 

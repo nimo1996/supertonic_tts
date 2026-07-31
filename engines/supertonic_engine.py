@@ -60,6 +60,7 @@ class SupertonicEngine:
         steps: int = 8,
         sfx_aliases: dict[str, str] | None = None,
         sample_rate: int | None = None,
+        bell_wav: str | None = None,
     ):
         from supertonic import TTS
         self._tts = TTS(auto_download=True)
@@ -69,6 +70,8 @@ class SupertonicEngine:
         self.sfx_aliases = sfx_aliases or {}
         # None이면 모델 기본 sample rate(self._tts.sample_rate) 그대로 사용
         self.sample_rate = sample_rate
+        # soundEffect(0~5) 필드로 tts 맨 앞에 반복 삽입할 종소리 wav
+        self.bell_wav = bell_wav
 
     def supports(self, lang: str) -> bool:
         return lang.lower() in self.SUPPORTED_LANGS
@@ -107,6 +110,7 @@ class SupertonicEngine:
         verbose: bool = True,
         sfx_base: Path | None = None,
         output_path: str | None = None,
+        sound_effect: int = 0,
     ) -> tuple[np.ndarray, int, float]:
         lines = [l for l in text.splitlines() if l.strip()]
         if not lines:
@@ -116,6 +120,23 @@ class SupertonicEngine:
         sr = self._tts.sample_rate
         gap_silence = np.zeros(int(sr * gap))
         tail_silence = np.zeros(int(sr * 0.15))
+
+        chunks = []
+        if sound_effect and sound_effect > 0:
+            if not self.bell_wav:
+                print("  [경고] sound_effect 지정됐지만 config.yaml의 sound_effect.wav 미설정 — 건너뜀", flush=True)
+            else:
+                bell_path = _resolve_path(self.bell_wav, sfx_base, output_path)
+                if not bell_path.exists():
+                    print(f"  [경고] 종소리 파일 없음: {bell_path} — 건너뜀", flush=True)
+                else:
+                    bell_audio = _load_sfx(str(bell_path), sr)
+                    if verbose:
+                        print(f"  [SOUND_EFFECT {bell_path.name} x{sound_effect}]")
+                    # 타종과 타종 사이 간격은 `gap` 요청값과 무관하게 항상 0으로 고정 (붙여서 재생)
+                    for i in range(sound_effect):
+                        chunks.append(bell_audio)
+                    chunks.append(gap_silence)
 
         def count_segments(l: str) -> int:
             if _MARKER_RE.match(l):
@@ -146,7 +167,6 @@ class SupertonicEngine:
             chunks.append(_load_sfx(str(path), sr))
             chunks.append(tail_silence)
 
-        chunks = []
         for i, line in enumerate(lines):
             m = _MARKER_RE.match(line)
             if m:
@@ -201,6 +221,7 @@ class SupertonicEngine:
         gap: float = 0.4,
         verbose: bool = True,
         sfx_base: Path | None = None,
+        sound_effect: int = 0,
     ) -> float:
         full_wav, sr, elapsed = self._synthesize_full_wav(
             text=text,
@@ -212,6 +233,7 @@ class SupertonicEngine:
             verbose=verbose,
             sfx_base=sfx_base,
             output_path=output_path,
+            sound_effect=sound_effect,
         )
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -234,6 +256,7 @@ class SupertonicEngine:
         gap: float = 0.4,
         verbose: bool = False,
         sfx_base: Path | None = None,
+        sound_effect: int = 0,
     ) -> tuple[bytes, float]:
         full_wav, sr, elapsed = self._synthesize_full_wav(
             text=text,
@@ -244,6 +267,7 @@ class SupertonicEngine:
             gap=gap,
             verbose=verbose,
             sfx_base=sfx_base,
+            sound_effect=sound_effect,
         )
 
         buf = io.BytesIO()

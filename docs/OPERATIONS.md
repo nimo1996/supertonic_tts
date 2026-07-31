@@ -280,6 +280,39 @@ curl -s -X POST http://127.0.0.1:9090/api/tts \
 
 문장 사이(줄 단위)의 간격을 조절하려면 구두점이 아니라 `gap` 필드를 쓴다 (`api-spec.md` 3.2/3.3절 참고).
 
+### 5.5 tts 맨 앞에 종소리 삽입 (`soundEffect`)
+
+API 요청에 `soundEffect` 필드(정수, `0`~`5`)를 추가하면 `config.yaml`의 `sound_effect.wav`에
+등록해둔 종소리 wav를 그 횟수만큼 반복해서 tts 음성 **맨 앞**에 붙인다. `0` 또는 생략 시 아무것도
+붙지 않는다.
+
+**① `config.yaml`에 종소리 wav 등록**
+
+```yaml
+sound_effect:
+  wav: sounds/ship_bell.wav
+```
+
+> **중요**: `config.yaml`을 수정한 뒤에는 API 서버를 재시작해야 반영된다 (`./run_api.sh restart`).
+
+**② API 요청 시 `soundEffect` 지정**
+
+```bash
+curl -s -X POST http://127.0.0.1:9090/api/tts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "안녕하세요, 오늘의 안내를 시작합니다.",
+    "filename": "announce_003",
+    "lang": "ko",
+    "soundEffect": 3
+  }'
+```
+
+타종끼리는 항상 간격 없이 붙여서 재생된다 (`gap` 값과 무관하게 고정). 종소리 전체가 끝난 뒤 tts
+본문이 시작되기 전 간격만 `gap` 필드 값을 쓴다 (생략 시 기본 0.4초). `sound_effect.wav`가 설정되어
+있지 않거나 파일이 없으면 경고 로그만 남기고 건너뛴다 (요청은 실패하지 않음). `/api/tts/audio`도
+동일하게 지원한다.
+
 엔드포인트 전체 규격(요청/응답 스키마, 에러 코드)은 [api-spec.md](api-spec.md) 참고.
 
 ---
@@ -299,6 +332,7 @@ curl -s -X POST http://127.0.0.1:9090/api/tts \
 | `api.port` | `9090` | API 리스닝 포트 |
 | `api.output_directory` | `output` | API가 저장하는 WAV 폴더. 상대경로는 설치 디렉터리 기준 |
 | `sfx` | (없음) | `<별칭>` 인라인 태그용 wav 파일 매핑 (`별칭: 경로` 형태, 5.3절 참고). 여러 개 등록 가능 |
+| `sound_effect.wav` | (없음) | API `soundEffect` 필드(1~5)로 tts 맨 앞에 반복 삽입할 종소리 wav 경로 (5.5절 참고) |
 
 CLI 옵션(`--voice`, `--speed`, `--steps` 등)은 `config.yaml`보다 우선한다.
 

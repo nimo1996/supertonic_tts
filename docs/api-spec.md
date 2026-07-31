@@ -2,7 +2,7 @@
 
 | 항목 | 내용 |
 |------|------|
-| 문서 버전 | 1.3 |
+| 문서 버전 | 1.5 |
 | 작성일 | 2026-07-03 |
 | 프로토콜 | HTTP/1.1 |
 | 데이터 형식 | JSON (요청), JSON 또는 WAV (응답) |
@@ -136,7 +136,8 @@ Content-Type: application/json
   "voice": "M2",
   "speed": 1.0,
   "lang": "ko",
-  "gap": 0.4
+  "gap": 0.4,
+  "soundEffect": 0
 }
 ```
 
@@ -148,6 +149,7 @@ Content-Type: application/json
 | `speed` | number (float) | X | `config.yaml`의 `supertonic.speed` | 발화 속도. 범위: 0.5 ~ 2.0 |
 | `lang` | string | X | `"ko"` | 언어 코드 (소문자) |
 | `gap` | number (float) | X | `0.4` | 줄/태그 조각 사이에 넣는 묵음(초). 범위: 0.0 ~ 5.0. 문장 내부 구두점 간격이나 인라인 `<별칭>` 태그 사이 간격(0.15초 고정)과는 별개 |
+| `soundEffect` | integer | X | `0` | `0`이면 무시. `1~5`면 `config.yaml`의 `sound_effect.wav`(종소리)를 그 횟수만큼 반복해서 tts 음성 맨 앞에 붙임. 반복끼리는 항상 간격 없이 붙여서 재생되며(`gap` 값과 무관), 종소리 전체와 tts 본문 사이 간격만 `gap` 값을 사용 |
 
 #### `filename` 규칙
 
@@ -266,6 +268,7 @@ Content-Type: application/json
   "speed": 1.0,
   "lang": "ko",
   "gap": 0.4,
+  "soundEffect": 0,
   "filename": "greeting"
 }
 ```
@@ -277,6 +280,7 @@ Content-Type: application/json
 | `speed` | number (float) | X | `config.yaml`의 `supertonic.speed` | 발화 속도. 범위: 0.5 ~ 2.0 |
 | `lang` | string | X | `"ko"` | 언어 코드 (소문자) |
 | `gap` | number (float) | X | `0.4` | 줄/태그 조각 사이에 넣는 묵음(초). 범위: 0.0 ~ 5.0 |
+| `soundEffect` | integer | X | `0` | `0`이면 무시. `1~5`면 `config.yaml`의 `sound_effect.wav`(종소리)를 그 횟수만큼 반복해서 tts 음성 맨 앞에 붙임. 반복끼리는 항상 간격 없이 붙여서 재생되며(`gap` 값과 무관), 종소리 전체와 tts 본문 사이 간격만 `gap` 값을 사용 |
 | `filename` | string | X | `"tts.wav"` | `Content-Disposition` 헤더에 사용할 파일명. 3.2절 `filename` 규칙 동일 적용 |
 
 `voice`, `lang` 값은 3.2절과 동일하다.
@@ -480,12 +484,34 @@ sfx:
 
 등록되지 않은 태그는 서버 로그에 경고를 남기고 건너뛴다 (요청은 실패하지 않음).
 
+### 5.3 시작 종소리 (`soundEffect`)
+
+`soundEffect` 필드(정수, 0~5)를 지정하면 `config.yaml`의 `sound_effect.wav`에 등록된 종소리 wav를 지정한 횟수만큼 반복해서 tts 음성 맨 앞에 붙인다. `0` 또는 생략 시 아무것도 붙이지 않는다.
+
+```yaml
+# config.yaml
+sound_effect:
+  wav: sounds/ship_bell.wav
+```
+
+```json
+{
+  "text": "안녕하세요, 오늘의 안내를 시작합니다.",
+  "lang": "ko",
+  "soundEffect": 3
+}
+```
+
+타종끼리는 항상 간격 없이 붙여서 재생된다 (`gap` 값과 무관하게 고정). 종소리 전체가 끝난 뒤 tts 본문이 시작되기 전 간격만 `gap` 필드 값을 사용한다 (생략 시 기본 0.4초). `config.yaml`에 `sound_effect.wav`가 설정되어 있지 않거나 파일이 없으면 서버 로그에 경고를 남기고 건너뛴다 (요청은 실패하지 않음).
+
 ---
 
 ## 6. 변경 이력
 
 | 버전 | 일자 | 변경 내용 |
 |------|------|-----------|
+| 1.5 | 2026-07-31 | `soundEffect` 타종 반복 사이 간격을 `gap` 값과 무관하게 항상 0으로 고정 (붙여서 재생) |
+| 1.4 | 2026-07-31 | `/api/tts`, `/api/tts/audio`에 `soundEffect` 필드 추가 (0~5, tts 맨 앞에 종소리 반복 삽입) |
 | 1.3 | 2026-07-31 | `/api/tts`, `/api/tts/audio`에 `gap` 필드 추가 (줄/태그 조각 사이 묵음 조절) |
 | 1.2 | 2026-07-31 | 스크립트 마커(`[BELL]`/`[SFX]`/`[PAUSE]`) 및 문장 내 별칭 태그(`<별칭>`) API 지원 명시, `/api/tts` 상대경로 기준을 `/api/tts/audio`와 통일 |
 | 1.1 | 2026-07-03 | `/api/tts/audio` 추가 (WAV 바이너리 직접 응답) |

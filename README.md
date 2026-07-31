@@ -256,6 +256,7 @@ sfx:
 | `-v, --voice` | 목소리 (F1~F5 / M1~M5) |
 | `-s, --speed` | 속도 (0.5~2.0) |
 | `-g, --gap` | 줄/태그 조각 사이 묵음(초) (기본: 0.4) |
+| `-e, --sound-effect` | tts 맨 앞 종소리 반복 횟수 (0~5, 기본: 0) |
 | `-l, --lang` | 언어 (기본: ko) |
 | `--host` | API 호스트 (기본: 127.0.0.1) |
 | `-p, --port` | 포트 (기본: config.yaml) |
@@ -326,6 +327,30 @@ curl -X POST http://127.0.0.1:9090/api/tts \
 `config.yaml`을 수정한 뒤에는 API 서버를 재시작해야 반영됩니다 (`./run_api.sh restart`) — 서버 기동 시
 `sfx` 목록을 한 번만 읽어 메모리에 올려두기 때문입니다.
 
+### `soundEffect` — tts 맨 앞에 종소리 삽입 (API)
+
+API 요청에 `soundEffect` 필드(정수, `0`~`5`)를 추가하면 `config.yaml`의 `sound_effect.wav`에 등록해둔
+종소리 wav를 그 횟수만큼 반복해서 tts 음성 **맨 앞**에 붙입니다. `0` 또는 생략 시 아무것도 붙지 않습니다.
+
+```yaml
+# config.yaml
+sound_effect:
+  wav: sounds/ship_bell.wav
+```
+
+```bash
+curl -X POST http://127.0.0.1:9090/api/tts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "안녕하세요, 오늘의 안내를 시작합니다.",
+    "filename": "announce_003",
+    "lang": "ko",
+    "soundEffect": 3
+  }'
+```
+
+타종끼리는 항상 간격 없이 붙여서 재생됩니다 (`gap` 값과 무관하게 고정). 종소리 전체와 tts 본문 사이 간격만 `gap` 필드 값을 씁니다. `/api/tts/audio`도 동일하게 지원합니다.
+
 ---
 
 ## 설정 (config.yaml)
@@ -351,6 +376,8 @@ api:
 | `output.directory` | CLI `--output` 미지정 시 저장 위치 |
 | `api.host` / `api.port` | HTTP API 바인딩 주소 |
 | `api.output_directory` | API 요청 시 WAV 저장 위치 |
+| `sound_effect.wav` | API `soundEffect` 필드(1~5)로 tts 맨 앞에 반복 삽입할 종소리 wav 경로 |
+| `sfx` | `<별칭>` 인라인 태그용 wav 파일 매핑 |
 
 CLI 옵션과 API 요청 본문의 값이 config.yaml보다 우선 적용됩니다.
 
