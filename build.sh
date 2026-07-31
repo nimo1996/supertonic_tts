@@ -38,7 +38,7 @@ cp run_api.sh "$PKG_DIR/"
 cp scripts/call_tts_api.sh "$PKG_DIR/scripts/"
 cp scripts/*.txt "$PKG_DIR/scripts/" 2>/dev/null || true
 cp -r sounds/. "$PKG_DIR/sounds/" 2>/dev/null || true
-cp docs/INSTALL.md docs/OPERATIONS.md "$PKG_DIR/" 2>/dev/null || true
+# cp docs/INSTALL.md docs/OPERATIONS.md "$PKG_DIR/" 2>/dev/null || true
 chmod +x "$PKG_DIR/supertonic-tts" "$PKG_DIR/supertonic-api" "$PKG_DIR/run_api.sh" "$PKG_DIR/scripts/call_tts_api.sh"
 
 echo "[4/4] 아카이브 생성..."
