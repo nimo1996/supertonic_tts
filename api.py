@@ -46,6 +46,9 @@ class TTSRequest(BaseModel):
     voice: str | None = Field(None, description="Voice id (F1~F5 / M1~M5)")
     speed: float | None = Field(None, ge=0.5, le=2.0, description="Speech speed")
     lang: str = Field("ko", description="Language code")
+    gap: float | None = Field(
+        None, ge=0.0, le=5.0, description="Silence between lines/segments in seconds (default 0.4)"
+    )
 
 
 class TTSAudioRequest(BaseModel):
@@ -53,6 +56,9 @@ class TTSAudioRequest(BaseModel):
     voice: str | None = Field(None, description="Voice id (F1~F5 / M1~M5)")
     speed: float | None = Field(None, ge=0.5, le=2.0, description="Speech speed")
     lang: str = Field("ko", description="Language code")
+    gap: float | None = Field(
+        None, ge=0.0, le=5.0, description="Silence between lines/segments in seconds (default 0.4)"
+    )
     filename: str | None = Field(
         None,
         description="Optional filename for Content-Disposition header",
@@ -126,7 +132,9 @@ def synthesize(req: TTSRequest):
             lang=lang,
             voice=voice,
             speed=req.speed,
+            gap=req.gap if req.gap is not None else 0.4,
             verbose=False,
+            sfx_base=PROJECT_ROOT,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -153,6 +161,7 @@ def synthesize_audio(req: TTSAudioRequest):
             lang=lang,
             voice=voice,
             speed=req.speed,
+            gap=req.gap if req.gap is not None else 0.4,
             verbose=False,
             sfx_base=PROJECT_ROOT,
         )

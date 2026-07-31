@@ -178,6 +178,29 @@ export SUPERTONIC_CACHE_DIR=/path/to/model
 
 > **주의:** 마커가 포함된 스크립트는 `--split` 옵션과 함께 사용하지 않습니다.
 
+### 문장 안 별칭 태그 (`<별칭>`)
+
+`config.yaml`에 wav 파일 별칭을 미리 등록해두면, 문장 **중간에도** `<별칭>` 태그로 끼워 넣을 수 있습니다.
+줄 전체를 마커로 써야 하는 `[BELL: 경로]`와 달리, 한 문장 안에서 텍스트 사이사이에 자유롭게 넣을 수 있습니다.
+
+**`config.yaml`:**
+
+```yaml
+sfx:
+  시작 종: sounds/bell.wav
+  종료 종: sounds/chime.wav
+```
+
+**텍스트 예시:**
+
+```text
+<시작 종> 안내말씀드리겠습니다. <종료 종>
+```
+
+태그 앞뒤 텍스트는 각각 별도로 TTS 생성된 뒤, 그 사이에 등록된 wav가 삽입됩니다 (문장이 끊기는 지점에서 자연스러운 억양 유지). 등록되지 않은 태그는 경고를 출력하고 건너뜁니다.
+
+이 기능은 CLI(`tts.py`)와 HTTP API(`/api/tts`, `/api/tts/audio`) 모두 동일하게 동작합니다 — `text` 필드에 태그를 그대로 포함해서 보내면 됩니다.
+
 ### 문장 내 간격 조절 (구두점 활용)
 
 | 구두점 | 예시 | 추가 간격 |
@@ -232,6 +255,7 @@ export SUPERTONIC_CACHE_DIR=/path/to/model
 | `-f, --filename` | 저장 파일명 (필수, 경로 없이) |
 | `-v, --voice` | 목소리 (F1~F5 / M1~M5) |
 | `-s, --speed` | 속도 (0.5~2.0) |
+| `-g, --gap` | 줄/태그 조각 사이 묵음(초) (기본: 0.4) |
 | `-l, --lang` | 언어 (기본: ko) |
 | `--host` | API 호스트 (기본: 127.0.0.1) |
 | `-p, --port` | 포트 (기본: config.yaml) |
@@ -265,6 +289,42 @@ curl -X POST http://127.0.0.1:9090/api/tts \
 
 API는 WAV 바이너리를 HTTP 응답으로 반환하지 않고, 서버 디스크에 저장한 뒤 경로만 반환합니다.  
 동일한 `filename`으로 재요청하면 기존 파일을 덮어씁니다.
+
+### `gap` — 줄/태그 조각 사이 묵음 조절
+
+`text`에 줄바꿈이나 `<별칭>` 태그가 여러 개 있을 때, 그 조각들 사이에 들어가는 묵음 길이(초)를
+`gap` 필드로 조절할 수 있습니다. 생략하면 `0.4`초입니다. 범위: `0.0` ~ `5.0`.
+
+```bash
+curl -X POST http://127.0.0.1:9090/api/tts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "첫 번째 안내입니다.\n두 번째 안내입니다.",
+    "filename": "announce_002",
+    "lang": "ko",
+    "gap": 0.8
+  }'
+```
+
+`/api/tts/audio`도 동일하게 `gap` 필드를 지원합니다.
+
+### `<별칭>` 태그로 wav 삽입 (API)
+
+위 [문장 안 별칭 태그](#문장-안-별칭-태그-별칭) 절에서 설명한 `config.yaml`의 `sfx:` 등록을 마쳤다면,
+API 요청의 `text`에도 그대로 `<별칭>`을 포함해 보내면 됩니다.
+
+```bash
+curl -X POST http://127.0.0.1:9090/api/tts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "<시작 종> 안내말씀드리겠습니다. <종료 종>",
+    "filename": "announce_001",
+    "lang": "ko"
+  }'
+```
+
+`config.yaml`을 수정한 뒤에는 API 서버를 재시작해야 반영됩니다 (`./run_api.sh restart`) — 서버 기동 시
+`sfx` 목록을 한 번만 읽어 메모리에 올려두기 때문입니다.
 
 ---
 

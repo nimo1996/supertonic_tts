@@ -10,6 +10,7 @@ TEXT=""
 FILENAME=""
 VOICE=""
 SPEED=""
+GAP=""
 LANG="ko"
 HEALTH_ONLY=0
 AUDIO_ONLY=0
@@ -33,6 +34,7 @@ For audio response mode:
 Optional:
   -v, --voice VOICE         Voice id (F1~F5 / M1~M5)
   -s, --speed SPEED         Speech speed (0.5 ~ 2.0)
+  -g, --gap GAP             Silence between lines/segments in seconds (default 0.4)
   -l, --lang LANG           Language code (default: ko)
       --host HOST           API host (default: 127.0.0.1)
   -p, --port PORT           API port (default: config.yaml api.port)
@@ -72,6 +74,7 @@ while [ $# -gt 0 ]; do
         -f|--filename) FILENAME="$2"; shift 2 ;;
         -v|--voice) VOICE="$2"; shift 2 ;;
         -s|--speed) SPEED="$2"; shift 2 ;;
+        -g|--gap) GAP="$2"; shift 2 ;;
         -l|--lang) LANG="$2"; shift 2 ;;
         --host) HOST="$2"; shift 2 ;;
         -p|--port) PORT="$2"; shift 2 ;;
@@ -127,6 +130,7 @@ fi
 JSON="{\"text\":\"$(json_escape "$TEXT")\",\"lang\":\"$(json_escape "$LANG")\""
 [ -n "$VOICE" ] && JSON+=",\"voice\":\"$(json_escape "$VOICE")\""
 [ -n "$SPEED" ] && JSON+=",\"speed\":$SPEED"
+[ -n "$GAP" ] && JSON+=",\"gap\":$GAP"
 [ -n "$FILENAME" ] && JSON+=",\"filename\":\"$(json_escape "$FILENAME")\""
 JSON+="}"
 

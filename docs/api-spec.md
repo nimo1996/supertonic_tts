@@ -2,7 +2,7 @@
 
 | 항목 | 내용 |
 |------|------|
-| 문서 버전 | 1.1 |
+| 문서 버전 | 1.3 |
 | 작성일 | 2026-07-03 |
 | 프로토콜 | HTTP/1.1 |
 | 데이터 형식 | JSON (요청), JSON 또는 WAV (응답) |
@@ -135,7 +135,8 @@ Content-Type: application/json
   "filename": "announce_001",
   "voice": "M2",
   "speed": 1.0,
-  "lang": "ko"
+  "lang": "ko",
+  "gap": 0.4
 }
 ```
 
@@ -146,6 +147,7 @@ Content-Type: application/json
 | `voice` | string | X | `config.yaml`의 `supertonic.voice` | 목소리 ID. 대소문자 무관 (`m2` -> `M2`) |
 | `speed` | number (float) | X | `config.yaml`의 `supertonic.speed` | 발화 속도. 범위: 0.5 ~ 2.0 |
 | `lang` | string | X | `"ko"` | 언어 코드 (소문자) |
+| `gap` | number (float) | X | `0.4` | 줄/태그 조각 사이에 넣는 묵음(초). 범위: 0.0 ~ 5.0. 문장 내부 구두점 간격이나 인라인 `<별칭>` 태그 사이 간격(0.15초 고정)과는 별개 |
 
 #### `filename` 규칙
 
@@ -263,6 +265,7 @@ Content-Type: application/json
   "voice": "M2",
   "speed": 1.0,
   "lang": "ko",
+  "gap": 0.4,
   "filename": "greeting"
 }
 ```
@@ -273,6 +276,7 @@ Content-Type: application/json
 | `voice` | string | X | `config.yaml`의 `supertonic.voice` | 목소리 ID. 대소문자 무관 (`m2` -> `M2`) |
 | `speed` | number (float) | X | `config.yaml`의 `supertonic.speed` | 발화 속도. 범위: 0.5 ~ 2.0 |
 | `lang` | string | X | `"ko"` | 언어 코드 (소문자) |
+| `gap` | number (float) | X | `0.4` | 줄/태그 조각 사이에 넣는 묵음(초). 범위: 0.0 ~ 5.0 |
 | `filename` | string | X | `"tts.wav"` | `Content-Disposition` 헤더에 사용할 파일명. 3.2절 `filename` 규칙 동일 적용 |
 
 `voice`, `lang` 값은 3.2절과 동일하다.
@@ -434,7 +438,47 @@ Client                    API Server
 | 응답 시간 | 텍스트 길이에 비례. 짧은 문장 기준 수 초 이내 (CPU RTF 3~5x) |
 | 타임아웃 | 클라이언트는 긴 문장 합성 시 60~120초 이상 타임아웃 설정 권장 |
 | 멀티라인 | API는 단일 `text` 문자열을 한 번에 합성. 줄바꿈(`\n`) 포함 시 엔진의 멀티라인 처리 규칙 적용 |
+| 스크립트 마커 | `text`에 `[BELL: 경로]` / `[SFX: 경로]` / `[PAUSE: 초]`를 **별도 줄**로 넣으면 CLI와 동일하게 처리됨 (5.1절 참고) |
+| 별칭 태그 | `text` 문장 **중간에** `<별칭>` 태그를 넣으면 `config.yaml`의 `sfx` 섹션에 등록된 wav가 그 위치에 삽입됨 (5.2절 참고) |
 | OpenAPI | 서버 실행 중 `http://{host}:{port}/docs` 에서 Swagger UI 제공 (FastAPI 자동 생성) |
+
+### 5.1 스크립트 마커 (효과음 / 묵음)
+
+`text` 필드 안에 아래 마커를 줄 단위로 넣으면 해당 위치에 wav 삽입 또는 묵음을 넣을 수 있다. 자세한 문법은 [README.md](../README.md#스크립트-마커-효과음--묵음-삽입) 참고.
+
+| 마커 | 설명 |
+|------|------|
+| `[BELL: 경로]` / `[SFX: 경로]` | 해당 wav 파일을 그 위치에 삽입 |
+| `[PAUSE: 초]` | 지정한 시간만큼 묵음 삽입 |
+
+```json
+{
+  "text": "[BELL: sounds/bell.wav]\n안녕하세요, 오늘의 안내를 시작합니다.\n[PAUSE: 1.0]\n감사합니다.",
+  "lang": "ko"
+}
+```
+
+상대 경로는 `/api/tts`, `/api/tts/audio` 모두 설치 디렉터리(프로젝트 루트) 기준으로 resolve된다.
+
+### 5.2 별칭 태그 (`<별칭>`)
+
+`config.yaml`의 `sfx` 섹션에 미리 등록해 둔 wav 파일은, `text` 문장 **중간에도** `<별칭>` 형태로 끼워 넣을 수 있다. 태그 앞뒤 텍스트는 각각 TTS로 합성되고 그 사이에 wav가 삽입된다.
+
+```yaml
+# config.yaml
+sfx:
+  시작 종: sounds/bell.wav
+  종료 종: sounds/chime.wav
+```
+
+```json
+{
+  "text": "<시작 종> 안내말씀드리겠습니다. <종료 종>",
+  "lang": "ko"
+}
+```
+
+등록되지 않은 태그는 서버 로그에 경고를 남기고 건너뛴다 (요청은 실패하지 않음).
 
 ---
 
@@ -442,5 +486,7 @@ Client                    API Server
 
 | 버전 | 일자 | 변경 내용 |
 |------|------|-----------|
+| 1.3 | 2026-07-31 | `/api/tts`, `/api/tts/audio`에 `gap` 필드 추가 (줄/태그 조각 사이 묵음 조절) |
+| 1.2 | 2026-07-31 | 스크립트 마커(`[BELL]`/`[SFX]`/`[PAUSE]`) 및 문장 내 별칭 태그(`<별칭>`) API 지원 명시, `/api/tts` 상대경로 기준을 `/api/tts/audio`와 통일 |
 | 1.1 | 2026-07-03 | `/api/tts/audio` 추가 (WAV 바이너리 직접 응답) |
 | 1.0 | 2026-06-24 | 최초 작성 (`/api/health`, `/api/tts`) |

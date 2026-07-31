@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>INSTALL.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="%EC%84%A4%EC%B9%98-%EB%A7%A4%EB%89%B4%EC%96%BC">설치 매뉴얼</h1>
+<p>multilingual-tts 배포판 설치 절차. 이 배포판은 <strong>컴파일된 실행파일</strong>(<code>supertonic-tts</code>, <code>supertonic-api</code>)만 포함하며,
+<code>.py</code> 소스 코드는 들어있지 않다. 소스에서 배포판을 만드는 방법은 맨 아래 &quot;빌드 담당자용&quot; 절을 참고.</p>
+<hr>
+<h2 id="1-%EC%9A%94%EA%B5%AC-%EC%82%AC%ED%95%AD">1. 요구 사항</h2>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OS</td>
+<td>Rocky Linux 8 x86_64 (빌드 시 사용한 배포판과 동일 계열 권장)</td>
+</tr>
+<tr>
+<td>아키텍처</td>
+<td>x86_64</td>
+</tr>
+<tr>
+<td>디스크</td>
+<td>최소 1GB 여유 공간 (실행파일 ~65MB × 2 + 모델 ~305MB + 생성 음성 파일)</td>
+</tr>
+<tr>
+<td>네트워크</td>
+<td>최초 1회 모델 다운로드 시 HuggingFace(<code>huggingface.co</code>)로 아웃바운드 접속 필요. 폐쇄망은 4절 참고</td>
+</tr>
+<tr>
+<td>방화벽</td>
+<td>API를 외부에 노출할 경우 <code>config.yaml</code>의 <code>api.port</code>(기본 9090) 인바운드 허용</td>
+</tr>
+<tr>
+<td>권한</td>
+<td>실행파일에 실행 권한(<code>chmod +x</code>)만 있으면 됨. root 불필요, 일반 사용자 계정으로 설치·운영 가능</td>
+</tr>
+</tbody>
+</table>
+<p>PyInstaller로 만든 실행파일은 <strong>빌드에 사용한 OS의 glibc 이상 버전</strong>에서만 동작한다. 빌드는 Rocky Linux 8에서
+했으므로, Rocky Linux 8/9 또는 그보다 최신인 RHEL 계열에서는 문제없이 동작한다. Ubuntu 등 다른 배포판에
+설치해야 하면 그 배포판에서 다시 빌드해야 한다.</p>
+<hr>
+<h2 id="2-%EC%84%A4%EC%B9%98-%EC%A0%88%EC%B0%A8">2. 설치 절차</h2>
+<h3 id="21-%EB%B0%B0%ED%8F%AC-%EC%95%84%EC%B9%B4%EC%9D%B4%EB%B8%8C-%EC%A0%84%EB%8B%AC%EB%B0%9B%EA%B8%B0">2.1 배포 아카이브 전달받기</h3>
+<p>빌드 담당자로부터 <code>supertonic-tts-YYYYMMDD.tar.gz</code> 파일을 전달받는다 (사내 파일 공유, scp 등).</p>
+<h3 id="22-%EC%95%95%EC%B6%95-%ED%95%B4%EC%A0%9C">2.2 압축 해제</h3>
+<pre class="hljs"><code><div>mkdir -p /opt/supertonic-tts   <span class="hljs-comment"># 설치 위치는 임의로 선택 가능. 예시로 /opt 사용</span>
+tar -C /opt/supertonic-tts --strip-components=1 -xzf supertonic-tts-YYYYMMDD.tar.gz
+<span class="hljs-built_in">cd</span> /opt/supertonic-tts
+</div></code></pre>
+<p>설치 후 디렉터리 구조:</p>
+<pre class="hljs"><code><div>/opt/supertonic-tts/
+├── supertonic-tts       # CLI 실행파일
+├── supertonic-api       # API 서버 실행파일
+├── run_api.sh           # API 서버 시작/중지/상태 스크립트
+├── config.yaml           # 설정 파일 (voice, speed, host, port, ...)
+├── scripts/
+│   ├── call_tts_api.sh   # API 호출용 curl 래퍼
+│   └── *.txt             # 언어별 샘플 텍스트
+├── sounds/               # [BELL]/[SFX] 마커용 효과음 샘플
+├── output/                # 생성된 WAV 저장 위치 (초기엔 비어있음)
+├── logs/                  # API 서버 로그
+├── INSTALL.md             # 이 문서
+└── OPERATIONS.md          # 운영 매뉴얼
+</div></code></pre>
+<h3 id="23-%EC%8B%A4%ED%96%89-%EA%B6%8C%ED%95%9C-%ED%99%95%EC%9D%B8">2.3 실행 권한 확인</h3>
+<p>압축 해제 시 보통 권한이 유지되지만, 확인 차 한 번 더 부여한다.</p>
+<pre class="hljs"><code><div>chmod +x supertonic-tts supertonic-api run_api.sh scripts/call_tts_api.sh
+</div></code></pre>
+<h3 id="24-%EC%84%A4%EC%A0%95-%ED%99%95%EC%9D%B8">2.4 설정 확인</h3>
+<p><code>config.yaml</code>을 열어 운영 환경에 맞게 조정한다.</p>
+<pre class="hljs"><code><div><span class="hljs-attr">supertonic:</span>
+  <span class="hljs-attr">voice:</span> <span class="hljs-string">M2</span>          <span class="hljs-comment"># 기본 목소리 (F1~F5 / M1~M5)</span>
+  <span class="hljs-attr">speed:</span> <span class="hljs-number">1.0</span>          <span class="hljs-comment"># 발화 속도 (0.5~2.0)</span>
+  <span class="hljs-attr">steps:</span> <span class="hljs-number">16</span>            <span class="hljs-comment"># 품질 단계 (4~16, 높을수록 느리고 품질 좋음)</span>
+
+<span class="hljs-attr">output:</span>
+  <span class="hljs-attr">directory:</span> <span class="hljs-string">output</span>   <span class="hljs-comment"># CLI 기본 출력 폴더</span>
+
+<span class="hljs-attr">api:</span>
+  <span class="hljs-attr">host:</span> <span class="hljs-number">0.0</span><span class="hljs-number">.0</span><span class="hljs-number">.0</span>        <span class="hljs-comment"># 0.0.0.0 = 모든 인터페이스에서 접속 허용</span>
+  <span class="hljs-attr">port:</span> <span class="hljs-number">9090</span>
+  <span class="hljs-attr">output_directory:</span> <span class="hljs-string">output</span>   <span class="hljs-comment"># 상대경로는 이 config.yaml 이 있는 설치 디렉터리 기준</span>
+</div></code></pre>
+<p>설정 항목별 상세 설명은 <a href="OPERATIONS.md">OPERATIONS.md</a>의 &quot;설정 변경&quot; 절 참고.</p>
+<blockquote>
+<p><strong>보안 주의</strong>: API는 인증 기능이 없다(<code>docs/api-spec.md</code> 참고). <code>api.host: 0.0.0.0</code>으로 두면 네트워크 상의
+누구나 API를 호출할 수 있으므로, 사내망 전용으로 방화벽을 잠그거나 <code>api.host: 127.0.0.1</code>로 두고 별도
+리버스 프록시/게이트웨이 뒤에서만 서비스하는 것을 권장한다.</p>
+</blockquote>
+<h3 id="25-%EC%B2%AB-%EC%8B%A4%ED%96%89-%EB%AA%A8%EB%8D%B8-%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C-%ED%99%95%EC%9D%B8">2.5 첫 실행 (모델 다운로드 확인)</h3>
+<p>TTS 모델(~305MB)은 실행파일에 포함되어 있지 않고, <strong>첫 실행 시 자동으로</strong> <code>~/.cache/supertonic3/</code>에
+다운로드된다. 인터넷이 되는 환경에서 최초 1회 아래처럼 실행해 정상 다운로드되는지 확인한다.</p>
+<pre class="hljs"><code><div>./supertonic-tts --text <span class="hljs-string">"설치 테스트입니다"</span> --lang ko -o /tmp/install_test.wav
+</div></code></pre>
+<p>몇 초~수십 초 내에 <code>[TTS] ...</code> 로그와 함께 <code>생성: N.Ns | ...</code> 줄이 출력되면 성공이다. 두 번째 실행부터는
+캐시를 재사용하므로 다운로드 없이 바로 실행된다.</p>
+<h3 id="26-api-%EC%84%9C%EB%B2%84-%EA%B8%B0%EB%8F%99-%ED%99%95%EC%9D%B8">2.6 API 서버 기동 확인</h3>
+<pre class="hljs"><code><div>./run_api.sh start
+./run_api.sh status     <span class="hljs-comment"># health: HTTP 200 이 나오면 정상</span>
+./scripts/call_tts_api.sh -t <span class="hljs-string">"안녕하세요"</span> -f smoke_test
+./run_api.sh stop
+</div></code></pre>
+<p>여기까지 정상이면 설치가 끝난 것이다. 상시 운영(부팅 시 자동 시작, systemd 등록 등)은
+<a href="OPERATIONS.md">OPERATIONS.md</a>를 참고한다.</p>
+<hr>
+<h2 id="3-%EC%97%AC%EB%9F%AC-%EB%8C%80%EC%97%90-%EB%B0%B0%ED%8F%AC%ED%95%98%EA%B8%B0">3. 여러 대에 배포하기</h2>
+<p>동일 아카이브(<code>supertonic-tts-YYYYMMDD.tar.gz</code>)를 각 서버에 복사해 2절 절차를 반복하면 된다.
+서버마다 <code>~/.cache/supertonic3/</code>에 모델을 각자 새로 받아야 하므로(자동), 서버 수가 많고 인터넷이
+느리다면 4절의 오프라인 방법으로 모델 캐시를 미리 준비해 함께 배포하는 것이 빠르다.</p>
+<hr>
+<h2 id="4-%ED%8F%90%EC%87%84%EB%A7%9D%EC%98%A4%ED%94%84%EB%9D%BC%EC%9D%B8-%EC%84%A4%EC%B9%98">4. 폐쇄망(오프라인) 설치</h2>
+<p>인터넷이 안 되는 서버에 설치해야 하면, 인터넷이 되는 다른 장비에서 모델을 미리 받아 캐시 디렉터리를
+통째로 복사해 온다.</p>
+<pre class="hljs"><code><div><span class="hljs-comment"># 인터넷 되는 장비에서</span>
+./supertonic-tts --text <span class="hljs-string">"warmup"</span> -o /tmp/warmup.wav
+tar -C ~/.cache -czf supertonic3-model-cache.tar.gz supertonic3
+
+<span class="hljs-comment"># 오프라인 서버로 옮긴 뒤</span>
+mkdir -p ~/.cache
+tar -C ~/.cache -xzf supertonic3-model-cache.tar.gz
+</div></code></pre>
+<p>이후 오프라인 서버에서 <code>./supertonic-tts ...</code>를 실행하면 다운로드 없이 캐시를 바로 사용한다.</p>
+<hr>
+<h2 id="5-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8">5. 업데이트</h2>
+<p>새 배포 아카이브를 받으면:</p>
+<pre class="hljs"><code><div><span class="hljs-built_in">cd</span> /opt/supertonic-tts
+./run_api.sh stop
+tar -C /tmp/supertonic-update --strip-components=1 -xzf supertonic-tts-새버전.tar.gz
+cp supertonic-tts supertonic-api run_api.sh /opt/supertonic-tts/   <span class="hljs-comment"># 실행파일과 스크립트만 교체</span>
+<span class="hljs-comment"># config.yaml, output/, logs/ 는 그대로 유지 (덮어쓰지 않는다)</span>
+./run_api.sh start
+</div></code></pre>
+<p><code>config.yaml</code>은 새 버전에 새 항목이 추가됐을 수 있으니, 업데이트 노트를 확인하고 필요한 항목만 수동으로 반영한다.</p>
+<hr>
+<h2 id="6-%EC%A0%9C%EA%B1%B0">6. 제거</h2>
+<pre class="hljs"><code><div>./run_api.sh stop
+rm -rf /opt/supertonic-tts
+<span class="hljs-comment"># 모델 캐시까지 지우려면 (다른 용도로 재사용하지 않는 경우에만)</span>
+rm -rf ~/.cache/supertonic3
+</div></code></pre>
+<hr>
+<h2 id="7-%EB%B9%8C%EB%93%9C-%EB%8B%B4%EB%8B%B9%EC%9E%90%EC%9A%A9-%EB%B0%B0%ED%8F%AC-%EC%95%84%EC%B9%B4%EC%9D%B4%EB%B8%8C-%EB%A7%8C%EB%93%A4%EA%B8%B0">7. 빌드 담당자용: 배포 아카이브 만들기</h2>
+<p>소스 저장소에서 배포판을 새로 빌드하려면(소스 코드 접근 권한이 있는 개발 환경에서):</p>
+<pre class="hljs"><code><div>bash setup.sh     <span class="hljs-comment"># 최초 1회: 빌드용 venv + 의존성 설치</span>
+bash build.sh     <span class="hljs-comment"># PyInstaller로 컴파일 + dist/supertonic-tts-YYYYMMDD.tar.gz 생성</span>
+</div></code></pre>
+<p><code>build.sh</code>는 <code>tts.py</code>/<code>api.py</code>를 각각 단일 실행파일로 컴파일하고, 실행에 필요한 <code>config.yaml</code>,
+<code>run_api.sh</code>, <code>scripts/</code>, <code>sounds/</code>를 묶어 <code>dist/supertonic-tts-pkg/</code>에 배치한 뒤 tar.gz로 압축한다.
+결과 아카이브에는 <code>.py</code> 파일이 전혀 포함되지 않는다(<code>find dist/supertonic-tts-pkg -name &quot;*.py&quot;</code>로 확인 가능).</p>
+<blockquote>
+<p>실행파일은 빌드에 사용한 OS/glibc에 종속된다. 배포 대상 서버와 동일하거나 더 낮은 버전의
+Rocky Linux/RHEL 계열에서 빌드해야 한다.</p>
+</blockquote>
+
+</body>
+</html>

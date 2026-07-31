@@ -11,6 +11,22 @@ VOICES = ["F1", "F2", "F3", "F4", "F5", "M1", "M2", "M3", "M4", "M5"]
 # [PAUSE: 1.5]  /  [BELL: sounds/bell.wav]  /  [SFX: sounds/chime.wav]
 _MARKER_RE = re.compile(r'^\[(PAUSE|BELL|SFX)\s*:\s*(.+?)\s*\]$', re.IGNORECASE)
 
+# 문장 중간에 끼워 넣는 별칭 태그: <시작 종>, <종료 종> ...
+_INLINE_TAG_RE = re.compile(r'<\s*([^<>]+?)\s*>')
+
+
+def _resolve_path(value: str, sfx_base: Path | None, output_path: str | None) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    if sfx_base is not None:
+        base = sfx_base
+    elif output_path is not None:
+        base = Path(output_path).parent.parent
+    else:
+        base = Path.cwd()
+    return base / value
+
 
 def _load_sfx(path: str, target_sr: int) -> np.ndarray:
     data, sr = sf.read(path, dtype="float32")
@@ -33,12 +49,19 @@ class SupertonicEngine:
         "et", "fi", "fr", "hi", "hr", "hu", "id", "it", "lt", "lv",
         "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi",
     }
-    def __init__(self, voice: str = "M2", speed: float = 1.05, steps: int = 8):
+    def __init__(
+        self,
+        voice: str = "M2",
+        speed: float = 1.05,
+        steps: int = 8,
+        sfx_aliases: dict[str, str] | None = None,
+    ):
         from supertonic import TTS
         self._tts = TTS(auto_download=True)
         self.voice = voice
         self.speed = speed
         self.steps = steps
+        self.sfx_aliases = sfx_aliases or {}
 
     def supports(self, lang: str) -> bool:
         return lang.lower() in self.SUPPORTED_LANGS
@@ -87,8 +110,34 @@ class SupertonicEngine:
         gap_silence = np.zeros(int(sr * gap))
         tail_silence = np.zeros(int(sr * 0.15))
 
-        tts_count = sum(1 for l in lines if not _MARKER_RE.match(l))
+        def count_segments(l: str) -> int:
+            if _MARKER_RE.match(l):
+                return 0
+            parts = _INLINE_TAG_RE.split(l)
+            return sum(1 for j, s in enumerate(parts) if j % 2 == 0 and s.strip())
+
+        tts_count = sum(count_segments(l) for l in lines)
         tts_idx = 0
+
+        def emit_tts(segment: str):
+            nonlocal tts_idx
+            tts_idx += 1
+            if verbose:
+                print(f"  [TTS {tts_idx}/{tts_count}] {segment[:40]}{'...' if len(segment) > 40 else ''}")
+            send = segment if segment[-1] in ".。!！?？,，" else segment + "."
+            wav, _ = self.generate(send, lang=lang, voice=voice, speed=speed, steps=steps)
+            chunks.append(wav)
+            chunks.append(tail_silence)
+
+        def emit_sfx(label: str, value: str):
+            path = _resolve_path(value, sfx_base, output_path)
+            if not path.exists():
+                print(f"  [경고] 파일 없음: {path} — 건너뜀", flush=True)
+                return
+            if verbose:
+                print(f"  [{label} {path.name}]")
+            chunks.append(_load_sfx(str(path), sr))
+            chunks.append(tail_silence)
 
         chunks = []
         for i, line in enumerate(lines):
@@ -105,29 +154,24 @@ class SupertonicEngine:
                         print(f"  [PAUSE {secs}s]")
                     chunks.append(np.zeros(int(sr * secs), dtype=np.float32))
                 else:  # BELL / SFX
-                    sfx_path = Path(value)
-                    if not sfx_path.is_absolute():
-                        if sfx_base is not None:
-                            base = sfx_base
-                        elif output_path is not None:
-                            base = Path(output_path).parent.parent
-                        else:
-                            base = Path.cwd()
-                        sfx_path = base / value
-                    if not sfx_path.exists():
-                        print(f"  [경고] 파일 없음: {sfx_path} — 건너뜀", flush=True)
-                        continue
-                    if verbose:
-                        print(f"  [{kind} {sfx_path.name}]")
-                    chunks.append(_load_sfx(str(sfx_path), sr))
+                    emit_sfx(kind, value)
             else:
-                tts_idx += 1
-                if verbose:
-                    print(f"  [TTS {tts_idx}/{tts_count}] {line[:40]}{'...' if len(line) > 40 else ''}")
-                send = line if line[-1] in ".。!！?？,，" else line + "."
-                wav, _ = self.generate(send, lang=lang, voice=voice, speed=speed, steps=steps)
-                chunks.append(wav)
-                chunks.append(tail_silence)
+                tag_matches = _INLINE_TAG_RE.search(line)
+                if not tag_matches:
+                    emit_tts(line)
+                else:
+                    parts = _INLINE_TAG_RE.split(line)
+                    for j, part in enumerate(parts):
+                        if j % 2 == 1:
+                            alias = part.strip()
+                            if alias not in self.sfx_aliases:
+                                print(f"  [경고] 등록되지 않은 태그: <{alias}> — 건너뜀", flush=True)
+                                continue
+                            emit_sfx(f"TAG <{alias}>", self.sfx_aliases[alias])
+                        else:
+                            text_part = part.strip()
+                            if text_part:
+                                emit_tts(text_part)
 
             if i < len(lines) - 1 and not _MARKER_RE.match(lines[i + 1]) and not m:
                 chunks.append(gap_silence)
@@ -146,6 +190,7 @@ class SupertonicEngine:
         steps: int | None = None,
         gap: float = 0.4,
         verbose: bool = True,
+        sfx_base: Path | None = None,
     ) -> float:
         full_wav, sr, elapsed = self._synthesize_full_wav(
             text=text,
@@ -155,6 +200,7 @@ class SupertonicEngine:
             steps=steps,
             gap=gap,
             verbose=verbose,
+            sfx_base=sfx_base,
             output_path=output_path,
         )
 

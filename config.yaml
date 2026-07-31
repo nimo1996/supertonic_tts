@@ -13,3 +13,14 @@ api:
   host: 0.0.0.0
   port: 9090
   output_directory: output   # 상대경로는 실행파일이 위치한 설치 디렉터리 기준
+
+# 텍스트 안 <별칭> 태그로 삽입할 wav 파일 매핑
+# 사용 예: "안내드립니다 <시작 종> 잠시 후 시작합니다."
+# 경로가 상대경로면 설치 디렉터리(프로젝트 루트) 기준으로 찾습니다.
+sfx:
+  시작 종: sounds/bell.wav
+  종료 종: sounds/chime.wav
+  클릭: sounds/click.wav
+  알림: sounds/notify.wav
+  경고음: sounds/alert.wav
+  성공음: sounds/success.wav

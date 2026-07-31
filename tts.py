@@ -47,6 +47,7 @@ def get_engine(config: dict):
             voice=cfg(config, "supertonic", "voice", default="M2"),
             speed=cfg(config, "supertonic", "speed", default=1.05),
             steps=cfg(config, "supertonic", "steps", default=8),
+            sfx_aliases=cfg(config, "sfx", default={}) or {},
         )
     return _engine
 
