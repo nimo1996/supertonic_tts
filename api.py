@@ -62,7 +62,14 @@ class TTSRequest(BaseModel):
         ),
     )
     gain: float | None = Field(
-        None, ge=0.1, le=5.0, description="Output volume multiplier (1.0 = original, e.g. 1.5 = +50%)"
+        None,
+        ge=0.1,
+        le=5.0,
+        description=(
+            "Fixed TTS voice volume multiplier (1.0 = original). Not applied to soundEffect/sfx wav. "
+            "Omit this field to auto-maximize volume instead (peak-normalized just under clipping every request) — "
+            "only set this to override with a fixed multiplier."
+        ),
     )
 
 
@@ -91,7 +98,14 @@ class TTSAudioRequest(BaseModel):
         description="Optional filename for Content-Disposition header",
     )
     gain: float | None = Field(
-        None, ge=0.1, le=5.0, description="Output volume multiplier (1.0 = original, e.g. 1.5 = +50%)"
+        None,
+        ge=0.1,
+        le=5.0,
+        description=(
+            "Fixed TTS voice volume multiplier (1.0 = original). Not applied to soundEffect/sfx wav. "
+            "Omit this field to auto-maximize volume instead (peak-normalized just under clipping every request) — "
+            "only set this to override with a fixed multiplier."
+        ),
     )
 
 

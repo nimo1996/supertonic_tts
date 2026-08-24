@@ -51,7 +51,7 @@ def get_engine(config: dict):
             sample_rate=cfg(config, "supertonic", "sample_rate", default=None),
             bell_wav_1x=cfg(config, "sound_effect", "wav_1x", default=None),
             bell_wav_2x=cfg(config, "sound_effect", "wav_2x", default=None),
-            gain=cfg(config, "supertonic", "gain", default=1.0),
+            gain=cfg(config, "supertonic", "gain", default=None),
         )
     return _engine
 
@@ -226,7 +226,7 @@ def main():
     parser.add_argument("--speed",  "-s", type=float, help="발화 속도 (기본: 1.05)")
     parser.add_argument("--steps",        type=int,   help="품질 단계 (기본: 8, 높을수록 느리고 좋음)")
     parser.add_argument("--gap",    "-g", type=float, help="줄 사이 묵음 (초, 기본: 0.4)")
-    parser.add_argument("--gain",         type=float, help="출력 음량 배율 (기본: 1.0, config.yaml gain)")
+    parser.add_argument("--gain",         type=float, help="TTS 음성 고정 음량 배율 (종소리/효과음 wav는 미적용). 생략 시 자동 최대화(피크 정규화)")
     parser.add_argument("--split",         action="store_true", help="줄별 개별 WAV 생성 (--input 필요)")
     parser.add_argument("--voices",       action="store_true", help="목소리 목록")
     parser.add_argument("--langs",        action="store_true", help="지원 언어 목록")
