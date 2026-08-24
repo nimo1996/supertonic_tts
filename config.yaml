@@ -18,20 +18,19 @@ api:
 
 # 참고: 문장 안 쉼표(,)/말줄임표(...)/(……)는 각각 +0.2s/+0.8s/+1.2s 간격이 자동 적용됨
 
-# API의 soundEffect 필드(0~5)로 tts 맨 앞에 삽입할 종소리 wav.
-# 0이면 무시, 1~5면 이 wav를 그 횟수만큼 반복해서 tts 본문 앞에 붙입니다.
+# API의 soundEffect 필드(0~10)로 tts 맨 앞에 삽입할 종소리 wav.
+# 0이면 무시, 1~5면 wav_1x를 그 횟수만큼, 6~10이면 wav_2x를 (N-5)회 반복해서 tts 본문 앞에 붙입니다.
 sound_effect:
-  wav: sounds/ship_bell.wav
+  wav_1x: sounds/captain_bell_1x.wav
+  wav_2x: sounds/captain_bell_2x.wav
 
 # 텍스트 안 <별칭> 태그로 삽입할 wav 파일 매핑
 # 사용 예: "안내드립니다 <시작 종> 잠시 후 시작합니다."
 # 경로가 상대경로면 설치 디렉터리(프로젝트 루트) 기준으로 찾습니다.
 sfx:
-  시작 종: sounds/bell.wav
-  종료 종: sounds/chime.wav
-  클릭: sounds/click.wav
   알림: sounds/notify.wav
   경고음: sounds/alert.wav
   성공음: sounds/success.wav
   함장승함 종1회: sounds/captain_bell_1x.wav
   함장승함 종2회: sounds/captain_bell_2x.wav
+  타종2회: sounds/ship_bell.wav

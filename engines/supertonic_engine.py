@@ -60,7 +60,8 @@ class SupertonicEngine:
         steps: int = 8,
         sfx_aliases: dict[str, str] | None = None,
         sample_rate: int | None = None,
-        bell_wav: str | None = None,
+        bell_wav_1x: str | None = None,
+        bell_wav_2x: str | None = None,
         gain: float = 1.0,
     ):
         from supertonic import TTS
@@ -71,8 +72,10 @@ class SupertonicEngine:
         self.sfx_aliases = sfx_aliases or {}
         # None이면 모델 기본 sample rate(self._tts.sample_rate) 그대로 사용
         self.sample_rate = sample_rate
-        # soundEffect(0~5) 필드로 tts 맨 앞에 반복 삽입할 종소리 wav
-        self.bell_wav = bell_wav
+        # soundEffect(0~10) 필드로 tts 맨 앞에 반복 삽입할 종소리 wav
+        # 1~5: bell_wav_1x를 N회, 6~10: bell_wav_2x를 (N-5)회 반복
+        self.bell_wav_1x = bell_wav_1x
+        self.bell_wav_2x = bell_wav_2x
         # 최종 wav 진폭 배율 (1.0 = 원본, 1.5 = 1.5배 증폭). 클리핑 방지를 위해 [-1, 1]로 clip됨
         self.gain = gain
 
@@ -127,18 +130,22 @@ class SupertonicEngine:
 
         chunks = []
         if sound_effect and sound_effect > 0:
-            if not self.bell_wav:
-                print("  [경고] sound_effect 지정됐지만 config.yaml의 sound_effect.wav 미설정 — 건너뜀", flush=True)
+            if 1 <= sound_effect <= 5:
+                bell_wav, repeat = self.bell_wav_1x, sound_effect
+            else:  # 6~10
+                bell_wav, repeat = self.bell_wav_2x, sound_effect - 5
+            if not bell_wav:
+                print("  [경고] sound_effect 지정됐지만 config.yaml의 sound_effect wav_1x/wav_2x 미설정 — 건너뜀", flush=True)
             else:
-                bell_path = _resolve_path(self.bell_wav, sfx_base, output_path)
+                bell_path = _resolve_path(bell_wav, sfx_base, output_path)
                 if not bell_path.exists():
                     print(f"  [경고] 종소리 파일 없음: {bell_path} — 건너뜀", flush=True)
                 else:
                     bell_audio = _load_sfx(str(bell_path), sr)
                     if verbose:
-                        print(f"  [SOUND_EFFECT {bell_path.name} x{sound_effect}]")
+                        print(f"  [SOUND_EFFECT {bell_path.name} x{repeat}]")
                     # 타종과 타종 사이 간격은 `gap` 요청값과 무관하게 항상 0으로 고정 (붙여서 재생)
-                    for i in range(sound_effect):
+                    for i in range(repeat):
                         chunks.append(bell_audio)
                     chunks.append(gap_silence)
 

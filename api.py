@@ -55,8 +55,11 @@ class TTSRequest(BaseModel):
         None,
         alias="soundEffect",
         ge=0,
-        le=5,
-        description="0: none, 1~5: number of bell wav repeats prepended before the TTS audio",
+        le=10,
+        description=(
+            "0: none, 1~5: captain_bell_1x.wav repeated N times, "
+            "6~10: captain_bell_2x.wav repeated (N-5) times, prepended before the TTS audio"
+        ),
     )
     gain: float | None = Field(
         None, ge=0.1, le=5.0, description="Output volume multiplier (1.0 = original, e.g. 1.5 = +50%)"
@@ -77,8 +80,11 @@ class TTSAudioRequest(BaseModel):
         None,
         alias="soundEffect",
         ge=0,
-        le=5,
-        description="0: none, 1~5: number of bell wav repeats prepended before the TTS audio",
+        le=10,
+        description=(
+            "0: none, 1~5: captain_bell_1x.wav repeated N times, "
+            "6~10: captain_bell_2x.wav repeated (N-5) times, prepended before the TTS audio"
+        ),
     )
     filename: str | None = Field(
         None,

@@ -49,7 +49,8 @@ def get_engine(config: dict):
             steps=cfg(config, "supertonic", "steps", default=8),
             sfx_aliases=cfg(config, "sfx", default={}) or {},
             sample_rate=cfg(config, "supertonic", "sample_rate", default=None),
-            bell_wav=cfg(config, "sound_effect", "wav", default=None),
+            bell_wav_1x=cfg(config, "sound_effect", "wav_1x", default=None),
+            bell_wav_2x=cfg(config, "sound_effect", "wav_2x", default=None),
             gain=cfg(config, "supertonic", "gain", default=1.0),
         )
     return _engine
