@@ -61,6 +61,7 @@ class SupertonicEngine:
         sfx_aliases: dict[str, str] | None = None,
         sample_rate: int | None = None,
         bell_wav: str | None = None,
+        gain: float = 1.0,
     ):
         from supertonic import TTS
         self._tts = TTS(auto_download=True)
@@ -72,6 +73,8 @@ class SupertonicEngine:
         self.sample_rate = sample_rate
         # soundEffect(0~5) 필드로 tts 맨 앞에 반복 삽입할 종소리 wav
         self.bell_wav = bell_wav
+        # 최종 wav 진폭 배율 (1.0 = 원본, 1.5 = 1.5배 증폭). 클리핑 방지를 위해 [-1, 1]로 clip됨
+        self.gain = gain
 
     def supports(self, lang: str) -> bool:
         return lang.lower() in self.SUPPORTED_LANGS
@@ -111,6 +114,7 @@ class SupertonicEngine:
         sfx_base: Path | None = None,
         output_path: str | None = None,
         sound_effect: int = 0,
+        gain: float | None = None,
     ) -> tuple[np.ndarray, int, float]:
         lines = [l for l in text.splitlines() if l.strip()]
         if not lines:
@@ -204,6 +208,9 @@ class SupertonicEngine:
                 chunks.append(gap_silence)
 
         full_wav = np.concatenate(chunks)
+        g = gain if gain is not None else self.gain
+        if g != 1.0:
+            full_wav = np.clip(full_wav * g, -1.0, 1.0).astype(np.float32)
         out_sr = self.sample_rate or sr
         if out_sr != sr:
             full_wav = _resample(full_wav, sr, out_sr)
@@ -222,6 +229,7 @@ class SupertonicEngine:
         verbose: bool = True,
         sfx_base: Path | None = None,
         sound_effect: int = 0,
+        gain: float | None = None,
     ) -> float:
         full_wav, sr, elapsed = self._synthesize_full_wav(
             text=text,
@@ -234,6 +242,7 @@ class SupertonicEngine:
             sfx_base=sfx_base,
             output_path=output_path,
             sound_effect=sound_effect,
+            gain=gain,
         )
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -257,6 +266,7 @@ class SupertonicEngine:
         verbose: bool = False,
         sfx_base: Path | None = None,
         sound_effect: int = 0,
+        gain: float | None = None,
     ) -> tuple[bytes, float]:
         full_wav, sr, elapsed = self._synthesize_full_wav(
             text=text,
@@ -268,6 +278,7 @@ class SupertonicEngine:
             verbose=verbose,
             sfx_base=sfx_base,
             sound_effect=sound_effect,
+            gain=gain,
         )
 
         buf = io.BytesIO()

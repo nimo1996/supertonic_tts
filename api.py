@@ -58,6 +58,9 @@ class TTSRequest(BaseModel):
         le=5,
         description="0: none, 1~5: number of bell wav repeats prepended before the TTS audio",
     )
+    gain: float | None = Field(
+        None, ge=0.1, le=5.0, description="Output volume multiplier (1.0 = original, e.g. 1.5 = +50%)"
+    )
 
 
 class TTSAudioRequest(BaseModel):
@@ -80,6 +83,9 @@ class TTSAudioRequest(BaseModel):
     filename: str | None = Field(
         None,
         description="Optional filename for Content-Disposition header",
+    )
+    gain: float | None = Field(
+        None, ge=0.1, le=5.0, description="Output volume multiplier (1.0 = original, e.g. 1.5 = +50%)"
     )
 
 
@@ -154,6 +160,7 @@ def synthesize(req: TTSRequest):
             verbose=False,
             sfx_base=PROJECT_ROOT,
             sound_effect=req.sound_effect or 0,
+            gain=req.gain,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -184,6 +191,7 @@ def synthesize_audio(req: TTSAudioRequest):
             verbose=False,
             sfx_base=PROJECT_ROOT,
             sound_effect=req.sound_effect or 0,
+            gain=req.gain,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
