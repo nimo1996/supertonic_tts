@@ -32,3 +32,5 @@ sfx:
   알림: sounds/notify.wav
   경고음: sounds/alert.wav
   성공음: sounds/success.wav
+  함장승함 종1회: sounds/captain_bell_1x.wav
+  함장승함 종2회: sounds/captain_bell_2x.wav

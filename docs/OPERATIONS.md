@@ -228,6 +228,10 @@ sfx:
   안내 벨: sounds/my_bell.wav
 ```
 
+> 예: `함장 승함(2단 이상 계류 시)` 안내용 종소리는 원본 녹음(`raw_sources/`에 보관, 배포 패키지에는
+> 포함되지 않음)에서 타종 1회/2회 구간만 잘라 `sounds/captain_bell_1x.wav`,
+> `sounds/captain_bell_2x.wav`로 등록해두었다 (`함장승함 종1회`, `함장승함 종2회` 별칭).
+
 > **중요**: `config.yaml`을 수정한 뒤에는 반드시 API 서버를 재시작해야 반영된다
 > (`./run_api.sh restart`, 6절 참고). API 서버는 기동 시 한 번만 `sfx` 목록을 읽어 메모리에 올려둔다.
 
