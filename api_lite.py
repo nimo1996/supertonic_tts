@@ -35,10 +35,12 @@ DEFAULTS = dict(
     gain=None,  # None = 매 요청마다 자동 최대 음량(피크 정규화)
     lang="ko",
     gap=0.4,
-    # 한 문장을 몇 번 생성해서 가장 또렷한 것을 고를지 (best-of-N).
-    # 모델 샘플러가 확률적이라 짧은 문장일수록 음절이 뭉개지거나 마지막 음절을
-    # 삼키는 실패 take가 섞인다. 기대 음절 수를 채우면 즉시 멈춘다.
+    # 5음절 이상 문장을 몇 번 생성해서 가장 또렷한 것을 고를지 (best-of-N).
+    # 기대 음절 수를 채우면 즉시 멈춘다.
     candidates=3,
+    # 4음절 이하 짧은 발화 전용 후보 수. 조기 종료 없이 다 뽑아 끝음 감쇠로 고른다
+    # — 페이드아웃 없이 음량이 뚝 떨어지는 take를 걸러낸다. 짧은 발화 지연 약 4.4s.
+    short_candidates=5,
     candidates_max_units=25,
     # 발음 교정 사전 — 합성 직전 텍스트 치환. ㆍ(U+318D)는 소리 없이 음절 경계만 만든다.
     pronunciation={
@@ -72,6 +74,7 @@ def get_engine() -> SupertonicEngine:
             bell_wav_2x=DEFAULTS["bell_wav_2x"],
             gain=DEFAULTS["gain"],
             candidates=DEFAULTS["candidates"],
+            short_candidates=DEFAULTS["short_candidates"],
             candidates_max_units=DEFAULTS["candidates_max_units"],
             pronunciation=DEFAULTS["pronunciation"],
         )

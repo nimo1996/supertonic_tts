@@ -233,25 +233,119 @@ def _speech_span(wav: np.ndarray, sr: int, rel_threshold: float = 0.04) -> float
     return float(active[-1] - active[0]) / sr
 
 
-def _take_score(wav: np.ndarray, sr: int, expected: int) -> tuple[int, tuple[float, float, float]]:
+def _voiced_tail(wav: np.ndarray, sr: int, hop_ms: float = 10.0) -> float:
+    """마지막 음절 정점부터 **유성음이 끝나는 지점**까지의 길이(초).
+
+    _final_syllable_tail과 달리 무성 구간을 tail로 세지 않는다. 이게 중요한
+    이유: 일부 take는 발화 뒤에 170~310ms짜리 숨소리를 붙이는데, 유성/무성을
+    구분하지 않으면 그런 take가 "끝음이 잘 살아있는 take"로 오인된다(실측:
+    숨 구간의 1kHz 이하 에너지 비중 35% vs 정상 발음 92%).
+
+    1kHz 저역통과 사본과 원본의 프레임별 에너지비로 유성 여부를 판정한다.
+    """
+    peaks, env = _syllable_nuclei(wav, sr, hop_ms=hop_ms)
+    if not peaks or env.size == 0:
+        return 0.0
+    low = np.convolve(wav, _sinc_lowpass(1000.0, sr), mode="same").astype(np.float32)
+    env_low = _rms_envelope(low, sr, hop_ms)
+    n = min(env.size, env_low.size)
+    if n == 0:
+        return 0.0
+    env, env_low = env[:n], env_low[:n]
+    peak = env.max()
+    if peak <= 1e-9:
+        return 0.0
+    voiced = (env > 0.10 * peak) & (
+        (env_low ** 2) > 0.5 * np.maximum(env ** 2, 1e-18)
+    )
+    if not voiced.any():
+        return 0.0
+    return max(0, int(np.flatnonzero(voiced)[-1]) - peaks[-1]) * hop_ms / 1000.0
+
+
+def _release_decay_ms(
+    wav: np.ndarray, sr: int, hop_ms: float = 2.0, win_ms: float = 10.0
+) -> float:
+    """마지막 음절이 -10dB에서 -30dB까지 떨어지는 데 걸리는 시간(ms).
+
+    사람이 말을 맺을 때는 진폭이 서서히 잦아든다. 이 모델은 같은 텍스트라도
+    take에 따라 그 감쇠가 12ms만에 끝나버리는 경우를 25~30% 확률로 낸다.
+    청취 검증에서 "발음은 다 들리는데 페이드아웃 느낌이 없고 음량이 뚝
+    떨어진다"고 지목된 take들이 정확히 이 값이 짧았다(결함 45ms / 정상 77ms,
+    AUC 0.81 — 측정한 지표 중 지각과 가장 잘 맞는다).
+
+    끝음 '길이'와는 다른 값이다. 길이로 고른 take는 결함률이 그대로였다.
+    """
+    hop = max(1, int(sr * hop_ms / 1000))
+    win = max(hop, int(sr * win_ms / 1000))
+    if len(wav) < win:
+        return 0.0
+    csum = np.concatenate([[0.0], np.cumsum(wav.astype(np.float64) ** 2)])
+    starts = np.arange(0, len(wav) - win + 1, hop)
+    db = 20 * np.log10(np.maximum(np.sqrt((csum[starts + win] - csum[starts]) / win), 1e-9))
+    db -= db.max()
+
+    active = np.flatnonzero(db > -35)
+    if active.size == 0:
+        return 0.0
+    end = int(active[-1])
+    back = int(150 / hop_ms)
+    lo = max(0, end - back)
+    peak = lo + int(np.argmax(db[lo:end + 1]))
+
+    def cross(threshold: float) -> int:
+        for i in range(peak, end + 1):
+            if db[i] - db[peak] <= threshold:
+                return i
+        return end
+
+    return (cross(-30.0) - cross(-10.0)) * hop_ms
+
+
+# 이 음절 수 이하는 "짧은 발화"로 보고 끝음 길이를 1순위로 평가한다.
+# 근거: 짧은 단어에서는 정점 개수가 모든 take에서 동일하게 나와(예: "확인."은
+# 8 take 전부 2) 1순위 키가 변별력을 완전히 잃는다. 반면 청취 검증에서 "끝이
+# 잘린 것 같다"고 지목된 take는 예외 없이 같은 그룹 내 끝음 최단이었다.
+_SHORT_UNITS = 4
+
+# 후보 중 최선의 감쇠가 이 값에 못 미치면 감쇠로 고르지 않는다.
+# 파열 받침으로 끝나는 말은 폐쇄로 끝나 감쇠가 원래 짧다("비상소집."의 8kHz
+# 감쇠는 6 take가 0~26ms로 전부 측정 격자(2ms) 근처였다). 그런 값들 중
+# 최댓값을 고르는 것은 잡음을 고르는 것과 같아서, 정점 개수 우선이던 기존
+# 동작보다 오히려 나쁜 take가 뽑혔다. 이때는 기존 순서로 되돌린다.
+_DECAY_FLOOR_MS = 40.0
+
+
+def _take_score(
+    wav: np.ndarray, sr: int, expected: int
+) -> tuple[int, tuple[float, float, float]]:
     """(정점 개수, 정렬용 점수). 점수가 클수록 좋은 take.
 
-    1순위: 기대 음절 수에 얼마나 근접했는가 (초과는 잡음/더듬음일 수 있어 감점).
-    2순위: 마지막 음절 정점 이후 길이 — 끝을 삼킨 take를 걸러낸다.
-    3순위: 전체 발화 길이.
+    긴 발화에서는 기대 음절 수 일치가 1순위다 — 음절이 뭉개진 take를 걸러내는
+    것이 가장 중요하다.
+
+    짧은 발화(_SHORT_UNITS 이하)에서는 순서를 뒤집어 감쇠 시간을 1순위로 쓴다.
+    짧은 단어는 정점 개수가 take마다 똑같이 나와서(예: "확인."은 8 take 전부 2)
+    1순위 키가 변별력을 완전히 잃기 때문이다.
+
+    1순위로 끝음 '길이'를 썼던 적이 있는데 효과가 없었다. 길이는 결함과 상관만
+    있고(AUC 0.74) 원인이 아니어서, 끝음이 짧은 take를 걸러내도 결함률이
+    5/15 → 4/15로 그대로였다. 감쇠 시간은 청취에서 지목된 현상 자체의 물리량이다.
+
+    끝음 길이는 2순위로 남긴다. 무성 구간을 제외한 _voiced_tail을 쓰는데,
+    무성까지 세면 발화 뒤에 숨소리가 붙은 take가 "끝음이 긴 take"로 오인된다.
     """
-    peaks, env = _syllable_nuclei(wav, sr)
+    peaks, _ = _syllable_nuclei(wav, sr)
     nuclei = len(peaks)
     matched = min(nuclei, expected)
     over = max(0, nuclei - expected)
 
-    tail = 0.0
-    if peaks and env.size:
-        active = np.flatnonzero(env > 0.10)
-        if active.size:
-            tail = max(0, int(active[-1]) - peaks[-1]) / 100.0  # hop 10ms → 초
+    clarity = matched - 0.5 * over
+    span = _speech_span(wav, sr)
 
-    return nuclei, (matched - 0.5 * over, tail, _speech_span(wav, sr))
+    if 0 < expected <= _SHORT_UNITS:
+        return nuclei, (_release_decay_ms(wav, sr), clarity, span)
+    return nuclei, (clarity, _voiced_tail(wav, sr), span)
 
 
 class SupertonicEngine:
@@ -280,6 +374,7 @@ class SupertonicEngine:
         bell_wav_2x: str | None = None,
         gain: float | None = None,
         candidates: int = 3,
+        short_candidates: int | None = None,
         candidates_max_units: int = 25,
         pronunciation: dict[str, str] | None = None,
     ):
@@ -299,8 +394,16 @@ class SupertonicEngine:
         # 자동으로 최대화(피크 정규화)하고, 숫자를 주면 그 배율을 고정으로 곱한다
         # (레거시 방식, 클리핑 방지를 위해 [-1, 1]로 clip됨)
         self.gain = gain
-        # 한 문장을 몇 번 생성해서 가장 또렷한 것을 고를지. 1이면 예전처럼 1회만.
+        # 한 문장을 몇 번 생성해서 가장 좋은 것을 고를지. 1이면 예전처럼 1회만.
         self.candidates = max(1, int(candidates))
+        # 짧은 발화(_SHORT_UNITS 이하)에만 쓰는 후보 수. 짧은 발화는 조기 종료
+        # 없이 매번 다 뽑으므로 비용이 후보 수에 정비례하고, 반대로 긴 문장은
+        # 정점 검출이 기대 음절 수를 못 채워 조기 종료가 거의 발동하지 않는다
+        # (16음절 문장에서 정점 9~11개). 그래서 하나의 값을 공유하면 검증된
+        # 이득이 없는 긴 문장까지 같이 느려진다(25음절 6.3s → 10.4s).
+        self.short_candidates = (
+            self.candidates if short_candidates is None else max(1, int(short_candidates))
+        )
         # 이 음절 수를 넘는 긴 문장은 후보 선별을 건너뛴다(느려지기만 하고,
         # 긴 문장은 애초에 뭉개짐 문제가 거의 없다).
         self.candidates_max_units = max(1, int(candidates_max_units))
@@ -359,20 +462,46 @@ class SupertonicEngine:
             # shape: (1, samples) → (samples,)
             return wav.squeeze(0)
 
-        n = self.candidates if candidates is None else max(1, int(candidates))
         expected = _expected_units(text)
+        short = 0 < expected <= _SHORT_UNITS
+        if candidates is not None:
+            n = max(1, int(candidates))
+        else:
+            n = self.short_candidates if short else self.candidates
         if n == 1 or expected == 0 or expected > self.candidates_max_units:
             return synth(), sr
 
+        # 후보 평가는 **실제 출력 sample rate**에서 한다. 8kHz로 내보내면
+        # 3.6kHz 위가 잘려나가므로, 모델 sr(44.1kHz)에서 잰 값이 최종 결과와
+        # 어긋날 수 있다 — "비상소집."에서 모델 기준 감쇠 142ms인 take가
+        # 8kHz에서는 16ms였다(모델↔출력 상관 +0.24). 끝소리에 고역이 걸리는
+        # 단어에서만 드러나서, 저역으로 끝나는 단어로 시험하면 놓친다.
+        score_sr = self.sample_rate or sr
+
+        if short:
+            # 짧은 발화는 조기 종료하지 않는다. 1순위가 감쇠 시간이라 "충분히
+            # 좋다"는 절대 기준을 세울 수 없고 — 정상 감쇠는 마지막 음운에
+            # 좌우된다 — 끝까지 뽑아 비교해야 그룹 내 최선을 고를 수 있다.
+            takes = []
+            for _ in range(n):
+                wav = synth()
+                probe = wav if score_sr == sr else _resample(wav, sr, score_sr)
+                takes.append((wav, _take_score(probe, score_sr, expected)[1]))
+            if max(sc[0] for _, sc in takes) < _DECAY_FLOOR_MS:
+                # 감쇠가 변별력을 잃은 경우 — 정점 개수 우선으로 되돌린다.
+                return max(takes, key=lambda t: (t[1][1], t[1][0], t[1][2]))[0], sr
+            return max(takes, key=lambda t: t[1])[0], sr
+
+        # 긴 발화는 음절 수를 채운 take가 나오면 조기 종료한다. 더 뽑아도 얻을
+        # 게 없고, 긴 문장은 애초에 take 편차가 작다(끝음 CV 0.10~0.17).
         best_wav: np.ndarray | None = None
         best_score = (-1e9, -1e9, -1e9)
         for i in range(n):
             wav = synth()
-            _, score = _take_score(wav, sr, expected)
+            probe = wav if score_sr == sr else _resample(wav, sr, score_sr)
+            _, score = _take_score(probe, score_sr, expected)
             if score > best_score:
                 best_wav, best_score = wav, score
-            # 음절 수만 채우고 바로 멈추면 "끝이 짧은" take가 그대로 통과한다.
-            # 최소 2개는 뽑아서 마지막 음절 길이까지 비교한 뒤에 조기 종료한다.
             if i >= 1 and best_score[0] >= expected:
                 break
         assert best_wav is not None

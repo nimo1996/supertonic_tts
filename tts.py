@@ -53,6 +53,7 @@ def get_engine(config: dict):
             bell_wav_2x=cfg(config, "sound_effect", "wav_2x", default=None),
             gain=cfg(config, "supertonic", "gain", default=None),
             candidates=cfg(config, "supertonic", "candidates", default=3),
+            short_candidates=cfg(config, "supertonic", "short_candidates", default=None),
             candidates_max_units=cfg(config, "supertonic", "candidates_max_units", default=25),
             pronunciation=cfg(config, "pronunciation", default={}) or {},
         )

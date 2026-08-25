@@ -76,8 +76,11 @@ class TTSRequest(BaseModel):
         ge=1,
         le=8,
         description=(
-            "Number of takes to generate and pick the clearest from (best-of-N). "
-            "Defaults to config.yaml supertonic.candidates. 1 disables selection."
+            "Number of takes to generate and pick the best from (best-of-N). "
+            "When omitted, short utterances (<=4 syllables) use "
+            "config.yaml supertonic.short_candidates and longer ones use supertonic.candidates. "
+            "Setting this explicitly applies the same count regardless of length. "
+            "1 disables selection."
         ),
     )
 
@@ -121,8 +124,11 @@ class TTSAudioRequest(BaseModel):
         ge=1,
         le=8,
         description=(
-            "Number of takes to generate and pick the clearest from (best-of-N). "
-            "Defaults to config.yaml supertonic.candidates. 1 disables selection."
+            "Number of takes to generate and pick the best from (best-of-N). "
+            "When omitted, short utterances (<=4 syllables) use "
+            "config.yaml supertonic.short_candidates and longer ones use supertonic.candidates. "
+            "Setting this explicitly applies the same count regardless of length. "
+            "1 disables selection."
         ),
     )
 
