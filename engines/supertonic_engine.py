@@ -308,12 +308,6 @@ def _release_decay_ms(
 # 잘린 것 같다"고 지목된 take는 예외 없이 같은 그룹 내 끝음 최단이었다.
 _SHORT_UNITS = 4
 
-# 후보 중 최선의 감쇠가 이 값에 못 미치면 감쇠로 고르지 않는다.
-# 파열 받침으로 끝나는 말은 폐쇄로 끝나 감쇠가 원래 짧다("비상소집."의 8kHz
-# 감쇠는 6 take가 0~26ms로 전부 측정 격자(2ms) 근처였다). 그런 값들 중
-# 최댓값을 고르는 것은 잡음을 고르는 것과 같아서, 정점 개수 우선이던 기존
-# 동작보다 오히려 나쁜 take가 뽑혔다. 이때는 기존 순서로 되돌린다.
-_DECAY_FLOOR_MS = 40.0
 
 
 def _take_score(
@@ -324,16 +318,23 @@ def _take_score(
     긴 발화에서는 기대 음절 수 일치가 1순위다 — 음절이 뭉개진 take를 걸러내는
     것이 가장 중요하다.
 
-    짧은 발화(_SHORT_UNITS 이하)에서는 순서를 뒤집어 감쇠 시간을 1순위로 쓴다.
-    짧은 단어는 정점 개수가 take마다 똑같이 나와서(예: "확인."은 8 take 전부 2)
-    1순위 키가 변별력을 완전히 잃기 때문이다.
+    2순위만 발화 길이에 따라 다르다. 짧은 발화(_SHORT_UNITS 이하)는 끝음 감쇠
+    시간을, 그보다 길면 끝음 길이를 쓴다. 짧은 단어는 정점 개수가 take마다
+    똑같이 나오는 일이 많아("확인."은 8 take 전부 2) 1순위만으로는 사실상
+    무작위 선택이 되는데, 그 동점을 감쇠로 깬다.
 
-    1순위로 끝음 '길이'를 썼던 적이 있는데 효과가 없었다. 길이는 결함과 상관만
+    감쇠를 1순위로 올려본 적이 있으나 되돌렸다. "함장 하함"처럼 여러 단어로 된
+    짧은 문구에서 음절이 뭉개진 take가 감쇠만 길면 선택돼 버린다. 정점 개수를
+    1순위로 두어도 감쇠 이득은 거의 그대로다(같은 풀에서 후보 5개 선별 시뮬레이션:
+    "좌현" 99.1ms→98.8ms, "함장 하함" 90.2ms→88.9ms, 무선별은 각각 77.8/71.1ms).
+    대신 정점 개수가 기대치와 일치하는 비율이 97.6%→100%, 90.7%→100%로 오른다.
+
+    끝음 '길이'를 기준으로 삼았던 적도 있는데 효과가 없었다. 길이는 결함과 상관만
     있고(AUC 0.74) 원인이 아니어서, 끝음이 짧은 take를 걸러내도 결함률이
     5/15 → 4/15로 그대로였다. 감쇠 시간은 청취에서 지목된 현상 자체의 물리량이다.
 
-    끝음 길이는 2순위로 남긴다. 무성 구간을 제외한 _voiced_tail을 쓰는데,
-    무성까지 세면 발화 뒤에 숨소리가 붙은 take가 "끝음이 긴 take"로 오인된다.
+    긴 발화의 2순위 끝음 길이는 무성 구간을 제외한 _voiced_tail을 쓴다. 무성까지
+    세면 발화 뒤에 숨소리가 붙은 take가 "끝음이 긴 take"로 오인된다.
     """
     peaks, _ = _syllable_nuclei(wav, sr)
     nuclei = len(peaks)
@@ -344,7 +345,7 @@ def _take_score(
     span = _speech_span(wav, sr)
 
     if 0 < expected <= _SHORT_UNITS:
-        return nuclei, (_release_decay_ms(wav, sr), clarity, span)
+        return nuclei, (clarity, _release_decay_ms(wav, sr), span)
     return nuclei, (clarity, _voiced_tail(wav, sr), span)
 
 
@@ -479,17 +480,16 @@ class SupertonicEngine:
         score_sr = self.sample_rate or sr
 
         if short:
-            # 짧은 발화는 조기 종료하지 않는다. 1순위가 감쇠 시간이라 "충분히
-            # 좋다"는 절대 기준을 세울 수 없고 — 정상 감쇠는 마지막 음운에
-            # 좌우된다 — 끝까지 뽑아 비교해야 그룹 내 최선을 고를 수 있다.
+            # 짧은 발화는 조기 종료하지 않는다. 정점 개수가 기대치를 채워도
+            # 2순위인 감쇠는 아직 비교가 안 끝났고, "감쇠가 충분히 길다"는 절대
+            # 기준은 세울 수 없다 — 정상값이 마지막 음운에 좌우되기 때문이다
+            # (파열받침 42ms, 비음받침 148ms). 끝까지 뽑아야 최선을 고를 수 있다.
+            # 짧은 단어는 생성도 빨라 비용이 작다.
             takes = []
             for _ in range(n):
                 wav = synth()
                 probe = wav if score_sr == sr else _resample(wav, sr, score_sr)
                 takes.append((wav, _take_score(probe, score_sr, expected)[1]))
-            if max(sc[0] for _, sc in takes) < _DECAY_FLOOR_MS:
-                # 감쇠가 변별력을 잃은 경우 — 정점 개수 우선으로 되돌린다.
-                return max(takes, key=lambda t: (t[1][1], t[1][0], t[1][2]))[0], sr
             return max(takes, key=lambda t: t[1])[0], sr
 
         # 긴 발화는 음절 수를 채운 take가 나오면 조기 종료한다. 더 뽑아도 얻을
