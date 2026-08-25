@@ -71,6 +71,15 @@ class TTSRequest(BaseModel):
             "only set this to override with a fixed multiplier."
         ),
     )
+    candidates: int | None = Field(
+        None,
+        ge=1,
+        le=8,
+        description=(
+            "Number of takes to generate and pick the clearest from (best-of-N). "
+            "Defaults to config.yaml supertonic.candidates. 1 disables selection."
+        ),
+    )
 
 
 class TTSAudioRequest(BaseModel):
@@ -105,6 +114,15 @@ class TTSAudioRequest(BaseModel):
             "Fixed TTS voice volume multiplier (1.0 = original). Not applied to soundEffect/sfx wav. "
             "Omit this field to auto-maximize volume instead (peak-normalized just under clipping every request) — "
             "only set this to override with a fixed multiplier."
+        ),
+    )
+    candidates: int | None = Field(
+        None,
+        ge=1,
+        le=8,
+        description=(
+            "Number of takes to generate and pick the clearest from (best-of-N). "
+            "Defaults to config.yaml supertonic.candidates. 1 disables selection."
         ),
     )
 
@@ -181,6 +199,7 @@ def synthesize(req: TTSRequest):
             sfx_base=PROJECT_ROOT,
             sound_effect=req.sound_effect or 0,
             gain=req.gain,
+            candidates=req.candidates,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -212,6 +231,7 @@ def synthesize_audio(req: TTSAudioRequest):
             sfx_base=PROJECT_ROOT,
             sound_effect=req.sound_effect or 0,
             gain=req.gain,
+            candidates=req.candidates,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

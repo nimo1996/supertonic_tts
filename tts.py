@@ -52,6 +52,9 @@ def get_engine(config: dict):
             bell_wav_1x=cfg(config, "sound_effect", "wav_1x", default=None),
             bell_wav_2x=cfg(config, "sound_effect", "wav_2x", default=None),
             gain=cfg(config, "supertonic", "gain", default=None),
+            candidates=cfg(config, "supertonic", "candidates", default=3),
+            candidates_max_units=cfg(config, "supertonic", "candidates_max_units", default=25),
+            pronunciation=cfg(config, "pronunciation", default={}) or {},
         )
     return _engine
 
@@ -124,6 +127,7 @@ def cmd_run(args, config: dict):
         steps=args.steps or None,
         gap=args.gap if args.gap is not None else 0.4,
         gain=args.gain or None,
+        candidates=args.candidates,
     )
 
 
@@ -188,6 +192,7 @@ def cmd_split(args, config: dict):
             speed=args.speed or None,
             steps=args.steps or None,
             gain=args.gain or None,
+            candidates=args.candidates,
         )
 
     print(f"[완료] {total}개 파일 생성: {out_dir}/")
@@ -227,6 +232,7 @@ def main():
     parser.add_argument("--steps",        type=int,   help="품질 단계 (기본: 8, 높을수록 느리고 좋음)")
     parser.add_argument("--gap",    "-g", type=float, help="줄 사이 묵음 (초, 기본: 0.4)")
     parser.add_argument("--gain",         type=float, help="TTS 음성 고정 음량 배율 (종소리/효과음 wav는 미적용). 생략 시 자동 최대화(피크 정규화)")
+    parser.add_argument("--candidates",   type=int, help="한 문장당 생성 후보 수 (best-of-N, 기본: config의 3). 1이면 후보 선별 없이 1회 생성")
     parser.add_argument("--split",         action="store_true", help="줄별 개별 WAV 생성 (--input 필요)")
     parser.add_argument("--voices",       action="store_true", help="목소리 목록")
     parser.add_argument("--langs",        action="store_true", help="지원 언어 목록")
