@@ -37,7 +37,7 @@ read_port() {
     local cfg="$SCRIPT_DIR/config.yaml"
     local port=""
     if [ -f "$cfg" ]; then
-        port="$(sed -n '/^api:/,/^[^[:space:]]/{/port:/{s/.*port:[[:space:]]*\([0-9]\+\).*/\1/p}}' "$cfg" | head -1)"
+        port="$(sed -n '/^api:/,/^[^[:space:]]/{/port:/{s/.*port:[[:space:]]*\([0-9]\{1,\}\).*/\1/p;};}' "$cfg" | head -1)"
     fi
     echo "${port:-9090}"
 }

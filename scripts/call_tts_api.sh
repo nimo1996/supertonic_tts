@@ -12,6 +12,7 @@ VOICE=""
 SPEED=""
 GAP=""
 SOUND_EFFECT=""
+GAIN=""
 LANG="ko"
 HEALTH_ONLY=0
 AUDIO_ONLY=0
@@ -36,8 +37,10 @@ Optional:
   -v, --voice VOICE         Voice id (F1~F5 / M1~M5)
   -s, --speed SPEED         Speech speed (0.5 ~ 2.0)
   -g, --gap GAP             Silence between lines/segments in seconds (default 0.4)
-  -e, --sound-effect N      Bell wav repeats prepended before tts audio (0~5, default 0)
+  -e, --sound-effect N      Bell wav repeats prepended before tts audio (0~10, default 0)
+                            0: none, 1~5: captain_bell_1x.wav x N, 6~10: captain_bell_2x.wav x (N-5)
   -l, --lang LANG           Language code (default: ko)
+      --gain GAIN           Fixed TTS voice volume multiplier (0.1~5.0). Omit to auto-maximize volume instead.
       --host HOST           API host (default: 127.0.0.1)
   -p, --port PORT           API port (default: config.yaml api.port)
       --health              Check /api/health only
@@ -55,7 +58,7 @@ read_port_from_config() {
     local cfg="config.yaml"
     local port=""
     if [ -f "$cfg" ]; then
-        port="$(sed -n '/^api:/,/^[^[:space:]]/{/port:/{s/.*port:[[:space:]]*\([0-9]\+\).*/\1/p}}' "$cfg" | head -1)"
+        port="$(sed -n '/^api:/,/^[^[:space:]]/{/port:/{s/.*port:[[:space:]]*\([0-9]\{1,\}\).*/\1/p;};}' "$cfg" | head -1)"
     fi
     echo "${port:-9090}"
 }
@@ -78,6 +81,7 @@ while [ $# -gt 0 ]; do
         -s|--speed) SPEED="$2"; shift 2 ;;
         -g|--gap) GAP="$2"; shift 2 ;;
         -e|--sound-effect) SOUND_EFFECT="$2"; shift 2 ;;
+        --gain) GAIN="$2"; shift 2 ;;
         -l|--lang) LANG="$2"; shift 2 ;;
         --host) HOST="$2"; shift 2 ;;
         -p|--port) PORT="$2"; shift 2 ;;
@@ -135,6 +139,7 @@ JSON="{\"text\":\"$(json_escape "$TEXT")\",\"lang\":\"$(json_escape "$LANG")\""
 [ -n "$SPEED" ] && JSON+=",\"speed\":$SPEED"
 [ -n "$GAP" ] && JSON+=",\"gap\":$GAP"
 [ -n "$SOUND_EFFECT" ] && JSON+=",\"soundEffect\":$SOUND_EFFECT"
+[ -n "$GAIN" ] && JSON+=",\"gain\":$GAIN"
 [ -n "$FILENAME" ] && JSON+=",\"filename\":\"$(json_escape "$FILENAME")\""
 JSON+="}"
 
