@@ -1,6 +1,7 @@
 import io
 import re
 import time
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -28,9 +29,30 @@ def _resolve_path(value: str, sfx_base: Path | None, output_path: str | None) ->
     return base / value
 
 
+@lru_cache(maxsize=8)
+def _sinc_lowpass(cutoff_hz: float, sr: int, numtaps: int = 255) -> np.ndarray:
+    """Blackman 창을 씌운 windowed-sinc 저역통과 FIR 계수."""
+    n = np.arange(numtaps) - (numtaps - 1) / 2.0
+    fc = cutoff_hz / sr
+    h = 2 * fc * np.sinc(2 * fc * n) * np.blackman(numtaps)
+    return (h / h.sum()).astype(np.float32)
+
+
 def _resample(data: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
+    """샘플레이트 변환. 다운샘플링 시에는 반드시 안티에일리어싱을 먼저 건다.
+
+    44.1kHz → 8kHz처럼 크게 낮출 때 저역통과 필터 없이 바로 솎아내면
+    4kHz 위의 성분이 가청대역 안으로 접혀 들어온다(aliasing). 이 접힌 성분은
+    ㅎ/ㅅ/ㅊ 같은 마찰음이 몰려 있는 3~4kHz 대역에 정확히 겹쳐서 자음 분간을
+    흐린다. 나이퀴스트의 90%(0.45 * target_sr) 지점에서 잘라낸 뒤 보간한다.
+    """
     if orig_sr == target_sr:
         return data
+    if target_sr < orig_sr:
+        taps = 255
+        if len(data) > taps:
+            h = _sinc_lowpass(0.45 * target_sr, orig_sr, taps)
+            data = np.convolve(data, h, mode="same").astype(np.float32)
     new_len = int(len(data) / orig_sr * target_sr)
     return np.interp(
         np.linspace(0, len(data) - 1, new_len),
