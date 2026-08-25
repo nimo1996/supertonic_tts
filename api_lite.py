@@ -42,9 +42,10 @@ DEFAULTS = dict(
     # — 페이드아웃 없이 음량이 뚝 떨어지는 take를 걸러낸다. 짧은 발화 지연 약 4.4s.
     short_candidates=5,
     candidates_max_units=25,
-    # 발음 교정 사전 — 합성 직전 텍스트 치환. ㆍ(U+318D)는 소리 없이 음절 경계만 만든다.
+    # 발음 교정 사전 — 합성 직전 텍스트 치환. ᄒ(U+1112)는 조합용 초성 자모라
+    # 그 자체로 음절을 만들지 않으면서 뒤 음절의 ㅎ를 살린다("하함" 18/18 정답).
     pronunciation={
-        "하함": "하ㆍ함",
+        "하함": "하ᄒ함",
     },
     bell_wav_1x="sounds/captain_bell_1x.wav",
     bell_wav_2x="sounds/captain_bell_2x.wav",
