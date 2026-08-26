@@ -387,8 +387,8 @@ class SupertonicEngine:
         self.sfx_aliases = sfx_aliases or {}
         # None이면 모델 기본 sample rate(self._tts.sample_rate) 그대로 사용
         self.sample_rate = sample_rate
-        # soundEffect(0~10) 필드로 tts 맨 앞에 반복 삽입할 종소리 wav
-        # 1~5: bell_wav_1x를 N회, 6~10: bell_wav_2x를 (N-5)회 반복
+        # soundEffect(0~4) 필드로 tts 맨 앞에 반복 삽입할 종소리 wav
+        # 1: 일과타종 1타 2회, 2~4: 예식타종 2타 N회
         self.bell_wav_1x = bell_wav_1x
         self.bell_wav_2x = bell_wav_2x
         # TTS 음성 구간에만 적용되는 배율. None이면 매 요청마다 TARGET_PEAK까지
@@ -542,10 +542,10 @@ class SupertonicEngine:
             tts_flags.append(is_tts)
 
         if sound_effect and sound_effect > 0:
-            if 1 <= sound_effect <= 5:
-                bell_wav, repeat = self.bell_wav_1x, sound_effect
-            else:  # 6~10
-                bell_wav, repeat = self.bell_wav_2x, sound_effect - 5
+            if sound_effect == 1:
+                bell_wav, repeat = self.bell_wav_1x, 2
+            else:  # 2~4
+                bell_wav, repeat = self.bell_wav_2x, sound_effect
             if not bell_wav:
                 print("  [경고] sound_effect 지정됐지만 config.yaml의 sound_effect wav_1x/wav_2x 미설정 — 건너뜀", flush=True)
             else:

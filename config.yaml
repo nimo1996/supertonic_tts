@@ -32,8 +32,8 @@ api:
 
 # 참고: 문장 안 쉼표(,)/말줄임표(...)/(……)는 각각 +0.2s/+0.8s/+1.2s 간격이 자동 적용됨
 
-# API의 soundEffect 필드(0~10)로 tts 맨 앞에 삽입할 종소리 wav.
-# 0이면 무시, 1~5면 wav_1x를 그 횟수만큼, 6~10이면 wav_2x를 (N-5)회 반복해서 tts 본문 앞에 붙입니다.
+# API의 soundEffect 필드(0~4)로 tts 맨 앞에 삽입할 종소리 wav.
+# 0이면 무시, 1이면 wav_1x(일과타종 1타)를 2회, 2~4면 wav_2x(예식타종 2타)를 그 횟수만큼 반복해서 tts 본문 앞에 붙입니다.
 sound_effect:
   wav_1x: sounds/captain_bell_1x.wav
   wav_2x: sounds/captain_bell_2x.wav
@@ -45,9 +45,9 @@ sfx:
   알림: sounds/notify.wav
   경고음: sounds/alert.wav
   성공음: sounds/success.wav
-  함장승함 종1회: sounds/captain_bell_1x.wav
-  함장승함 종2회: sounds/captain_bell_2x.wav
-  타종2회: sounds/ship_bell.wav
+  일과타종: sounds/captain_bell_1x.wav
+  예식타종: sounds/captain_bell_2x.wav
+  종소리: sounds/ship_bell.wav
 
 # 발음 교정 사전 — 합성 직전에 텍스트를 그대로 치환한다.
 # Supertonic v3는 G2P 없이 문자를 먹는 모델이라 한국어의 모음 사이 ㅎ 약화를

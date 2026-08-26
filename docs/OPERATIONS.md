@@ -286,9 +286,9 @@ curl -s -X POST http://127.0.0.1:9090/api/tts \
 
 ### 5.5 tts 맨 앞에 종소리 삽입 (`soundEffect`)
 
-API 요청에 `soundEffect` 필드(정수, `0`~`10`)를 추가하면 `config.yaml`의 `sound_effect.wav_1x`/`wav_2x`에
-등록해둔 종소리 wav를 tts 음성 **맨 앞**에 붙인다. `1`~`5`면 `wav_1x`를 그 횟수만큼, `6`~`10`이면
-`wav_2x`를 `(N-5)`회만큼 반복해서 붙인다. `0` 또는 생략 시 아무것도 붙지 않는다.
+API 요청에 `soundEffect` 필드(정수, `0`~`4`)를 추가하면 `config.yaml`의 `sound_effect.wav_1x`/`wav_2x`에
+등록해둔 종소리 wav를 tts 음성 **맨 앞**에 붙인다. `1`이면 `wav_1x`(일과타종 1타)를 2회, `2`~`4`면
+`wav_2x`(예식타종 2타)를 그 횟수만큼 반복해서 붙인다. `0` 또는 생략 시 아무것도 붙지 않는다.
 
 **① `config.yaml`에 종소리 wav 등록**
 
@@ -337,7 +337,7 @@ curl -s -X POST http://127.0.0.1:9090/api/tts \
 | `api.port` | `9090` | API 리스닝 포트 |
 | `api.output_directory` | `output` | API가 저장하는 WAV 폴더. 상대경로는 설치 디렉터리 기준 |
 | `sfx` | (없음) | `<별칭>` 인라인 태그용 wav 파일 매핑 (`별칭: 경로` 형태, 5.3절 참고). 여러 개 등록 가능 |
-| `sound_effect.wav_1x` / `wav_2x` | (없음) | API `soundEffect` 필드(1~5 / 6~10)로 tts 맨 앞에 반복 삽입할 종소리 wav 경로 (5.5절 참고) |
+| `sound_effect.wav_1x` / `wav_2x` | (없음) | API `soundEffect` 필드(1: 일과타종 1타 2회 / 2~4: 예식타종 2타 N회)로 tts 맨 앞에 반복 삽입할 종소리 wav 경로 (5.5절 참고) |
 
 CLI 옵션(`--voice`, `--speed`, `--steps` 등)은 `config.yaml`보다 우선한다.
 

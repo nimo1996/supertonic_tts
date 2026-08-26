@@ -329,9 +329,9 @@ curl -X POST http://127.0.0.1:9090/api/tts \
 
 ### `soundEffect` — tts 맨 앞에 종소리 삽입 (API)
 
-API 요청에 `soundEffect` 필드(정수, `0`~`10`)를 추가하면 `config.yaml`의 `sound_effect.wav_1x`/`wav_2x`에
-등록해둔 종소리 wav를 tts 음성 **맨 앞**에 붙입니다. `1`~`5`면 `wav_1x`를 그 횟수만큼, `6`~`10`이면
-`wav_2x`를 `(N-5)`회만큼 반복해서 붙입니다. `0` 또는 생략 시 아무것도 붙지 않습니다.
+API 요청에 `soundEffect` 필드(정수, `0`~`4`)를 추가하면 `config.yaml`의 `sound_effect.wav_1x`/`wav_2x`에
+등록해둔 종소리 wav를 tts 음성 **맨 앞**에 붙입니다. `1`이면 `wav_1x`(일과타종 1타)를 2회, `2`~`4`면
+`wav_2x`(예식타종 2타)를 그 횟수만큼 반복해서 붙입니다. `0` 또는 생략 시 아무것도 붙지 않습니다.
 
 ```yaml
 # config.yaml
@@ -385,7 +385,7 @@ api:
 | `output.directory` | CLI `--output` 미지정 시 저장 위치 |
 | `api.host` / `api.port` | HTTP API 바인딩 주소 |
 | `api.output_directory` | API 요청 시 WAV 저장 위치 |
-| `sound_effect.wav_1x` / `wav_2x` | API `soundEffect` 필드(1~5 / 6~10)로 tts 맨 앞에 반복 삽입할 종소리 wav 경로 |
+| `sound_effect.wav_1x` / `wav_2x` | API `soundEffect` 필드(1: 일과타종 1타 2회 / 2~4: 예식타종 2타 N회)로 tts 맨 앞에 반복 삽입할 종소리 wav 경로 |
 | `sfx` | `<별칭>` 인라인 태그용 wav 파일 매핑 |
 | `supertonic.candidates` | 발음이 뭉개지는 실패 take를 걸러내는 best-of-N 후보 수 (5음절 이상) |
 | `supertonic.short_candidates` | 끝음이 뚝 끊기는 take를 걸러내는 후보 수 (4음절 이하) |

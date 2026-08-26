@@ -55,10 +55,9 @@ class TTSRequest(BaseModel):
         None,
         alias="soundEffect",
         ge=0,
-        le=10,
+        le=4,
         description=(
-            "0: none, 1~5: captain_bell_1x.wav repeated N times, "
-            "6~10: captain_bell_2x.wav repeated (N-5) times, prepended before the TTS audio"
+            "0: none, 1: 일과타종 1타 2회, 2~4: 예식타종 2타 N회, prepended before the TTS audio"
         ),
     )
     gain: float | None = Field(
@@ -99,10 +98,9 @@ class TTSAudioRequest(BaseModel):
         None,
         alias="soundEffect",
         ge=0,
-        le=10,
+        le=4,
         description=(
-            "0: none, 1~5: captain_bell_1x.wav repeated N times, "
-            "6~10: captain_bell_2x.wav repeated (N-5) times, prepended before the TTS audio"
+            "0: none, 1: 일과타종 1타 2회, 2~4: 예식타종 2타 N회, prepended before the TTS audio"
         ),
     )
     filename: str | None = Field(
