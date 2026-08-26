@@ -54,14 +54,21 @@ class Cell:
         return self.bad / self.n if self.n else 0.0
 
 
-def collect(conn, judge: str, max_cer: float = 0.6):
+def collect(conn, judge: str, max_cer: float = 0.6, sr: int = 0, cand: str = ""):
     """토큰 자리마다 (조합, 무너졌나)를 센다."""
-    rows = conn.execute("""
+    # rescore.py 를 아직 안 돌린 DB(수집 중)에도 붙을 수 있어야 한다.
+    # 표면형 정렬은 여기서 직접 하므로 재채점 결과에 의존할 필요가 없다.
+    has_judgeable = any(r[1] == "judgeable"
+                        for r in conn.execute("PRAGMA table_info(hyp)"))
+    guard = "h.judgeable = 1 AND" if has_judgeable else ""
+    rows = conn.execute(f"""
         SELECT t.text, t.expect, t.target, t.voice, t.mode, h.text AS hyp
         FROM trial t JOIN hyp h ON h.trial_id = t.id
-        WHERE h.judge = ? AND h.judgeable = 1 AND t.sensitivity = 'high'
+        WHERE h.judge = ? AND {guard} t.sensitivity = 'high'
           AND t.text NOT GLOB '*[0-9A-Za-z%]*'
-    """, (judge,)).fetchall()
+          AND (? = 0 OR t.sr = ?)
+          AND (? = '' OR t.key LIKE '%|' || ?)
+    """, (judge, sr, sr, cand, cand)).fetchall()
 
     tables = {k: defaultdict(Cell) for k in
               ("boundary", "onset_nucleus", "nucleus_coda", "jamo", "onset_pos")}
@@ -208,6 +215,12 @@ def main() -> None:
                     help="서로 다른 낱말 이만큼에서 나와야 규칙 후보로 본다")
     ap.add_argument("--min-n", type=int, default=30)
     ap.add_argument("--top", type=int, default=15)
+    ap.add_argument("--sr", type=int, default=0,
+                    help="이 sample rate 만 집계 (0이면 전부). 8k와 16k를 "
+                         "섞으면 대역 탓과 합성 탓이 구분되지 않는다")
+    ap.add_argument("--cand", default="",
+                    help="best-of-N 후보 수가 이 값인 시행만 (예: 1, 5, None). "
+                         "시행 키 끝에 붙어 있어 스키마 변경 없이 걸러낸다")
     ap.add_argument("--lift", type=float, default=2.0,
                     help="합의 표에서 요구하는 기준선 대비 배수")
     ap.add_argument("--max-cer", type=float, default=0.6,
@@ -217,7 +230,7 @@ def main() -> None:
     conn = sqlite3.connect(args.db)
     per_judge = {}
     for judge in JUDGES:
-        tables, total = collect(conn, judge, args.max_cer)
+        tables, total = collect(conn, judge, args.max_cer, args.sr, args.cand)
         per_judge[judge] = (tables, total[1] / total[0] if total[0] else 0.0)
 
     print("=" * 86)

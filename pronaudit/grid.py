@@ -78,6 +78,27 @@ def nucleus_coda_items(seed: int = 13) -> list[Item]:
     return _pack(toks, "nc", "중성종성", seed)
 
 
+GLIDES = list("ㅘㅝㅚㅟㅑㅕㅛㅠ")
+
+
+def glide_items(seed: int = 17) -> list[Item]:
+    """활음 이중모음만 모은 부분집합 — best-of-N 효과를 재기 위한 것.
+
+    격자에서 활음 소실이 65~92%로 나왔는데, 100%가 아니라는 건 살아남는
+    take가 있다는 뜻이다. 그렇다면 이미 있는 best-of-N 후보 선별로 건질 수
+    있는지가 실제로 조치 가능한지를 가른다. 같은 문항을 --candidates 만
+    바꿔 두 번 돌려 비교한다(시행 키에 candidates 가 들어가 섞이지 않는다).
+
+    활음만 담은 토큰으로 채운다 — 한 발화에 정상 모음이 섞이면 후보 선별이
+    그쪽 기준으로 take를 고를 수 있어 효과가 흐려진다.
+    """
+    toks = []
+    for v in GLIDES:
+        for onset in ONSETS:
+            toks.append((f"{onset}{v}", 0, compose("ㄷ", "ㅗ", " ") + compose(onset, v, " ")))
+    return _pack(toks, "gl", "활음", seed)
+
+
 def _pack(toks, prefix: str, axis: str, seed: int) -> list[Item]:
     """토큰을 쉼표로 묶어 발화로 만든다.
 
@@ -107,11 +128,13 @@ def build(which: str = "all") -> list[Item]:
         out += onset_nucleus_items()
     if which in ("all", "coda"):
         out += nucleus_coda_items()
+    if which == "glide":
+        out = glide_items()
     return out
 
 
 if __name__ == "__main__":
-    for which in ("boundary", "onset", "coda"):
+    for which in ("boundary", "onset", "coda", "glide"):
         its = build(which)
         n_tok = sum(len(i.text.rstrip(".").split(", ")) for i in its)
         print(f"{which:9s} 발화 {len(its):4d} · 토큰 {n_tok:5d}")

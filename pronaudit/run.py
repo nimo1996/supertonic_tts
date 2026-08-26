@@ -133,7 +133,7 @@ def main() -> None:
                     help="best-of-N 후보 수. 미지정이면 config 설정(운용과 동일)")
     ap.add_argument("--no-carrier", action="store_true")
     ap.add_argument("--grid", default="none",
-                    choices=["none", "all", "boundary", "onset", "coda"],
+                    choices=["none", "all", "boundary", "onset", "coda", "glide"],
                     help="낱말 코퍼스 대신 글자 조합 격자를 돌린다 (규칙 탐색용)")
     ap.add_argument("--include-nonword", action="store_true",
                     help="비단어 짝도 합성한다 (기본은 제외 — 항상 오답이라 낭비)")
