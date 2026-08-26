@@ -1,0 +1,25 @@
+# linux/x86_64 배포 바이너리를 만들기 위한 빌드 전용 이미지.
+# macOS(arm64) 개발 머신에서는 PyInstaller가 크로스 컴파일을 못 하므로,
+# 배포 대상(OS/아키텍처)과 동일한 컨테이너 안에서 빌드한다.
+# 빌드 이미지의 glibc보다 낮은 glibc를 가진 서버에서는 실행이 안 되므로
+# (PyInstaller 바이너리는 forward-compatible하지 않음), 배포 대상 서버의
+# glibc 버전(`ldd --version`)보다 같거나 낮은 배포판 태그로 고정한다.
+# bullseye(Debian 11) = glibc 2.31, 대부분의 RHEL/CentOS/Ubuntu 20.04+ 서버와 호환.
+FROM python:3.11-slim-bullseye
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsndfile1 \
+    binutils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir pyinstaller
+
+COPY . .
+
+RUN python -m PyInstaller build_pkg/supertonic.spec --clean --noconfirm \
+    --distpath build_pkg/dist-linux --workpath build_pkg/work-linux

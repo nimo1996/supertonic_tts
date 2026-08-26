@@ -4,6 +4,8 @@
 # PyInstaller 빌드 산출물
 build_pkg/dist/
 build_pkg/work/
+build_pkg/dist-linux/
+build_pkg/work-linux/
 dist/
 
 # 모델 파일 (용량 큼)

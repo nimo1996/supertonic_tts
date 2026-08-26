@@ -1,0 +1,14 @@
+.git
+.venv
+pronaudit
+dist
+build_pkg/dist
+build_pkg/dist-linux
+build_pkg/work
+build_pkg/work-linux
+models
+output
+logs
+__pycache__
+*.pyc
+.DS_Store
