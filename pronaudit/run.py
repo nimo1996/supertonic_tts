@@ -31,6 +31,7 @@ ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 
 import corpus  # noqa: E402
+import grid  # noqa: E402
 import jamo  # noqa: E402
 import judges  # noqa: E402
 
@@ -131,6 +132,9 @@ def main() -> None:
     ap.add_argument("--candidates", type=int, default=None,
                     help="best-of-N 후보 수. 미지정이면 config 설정(운용과 동일)")
     ap.add_argument("--no-carrier", action="store_true")
+    ap.add_argument("--grid", default="none",
+                    choices=["none", "all", "boundary", "onset", "coda"],
+                    help="낱말 코퍼스 대신 글자 조합 격자를 돌린다 (규칙 탐색용)")
     ap.add_argument("--include-nonword", action="store_true",
                     help="비단어 짝도 합성한다 (기본은 제외 — 항상 오답이라 낭비)")
     ap.add_argument("--extra", default="", help="추가 텍스트 파일 (쉼표 구분)")
@@ -153,8 +157,11 @@ def main() -> None:
     wav_dir.mkdir(parents=True, exist_ok=True)
 
     extra = [Path(p) for p in args.extra.split(",") if p.strip()]
-    items = corpus.build(include_carrier=not args.no_carrier, extra_files=extra,
-                         include_nonword=args.include_nonword)
+    if args.grid != "none":
+        items = grid.build(args.grid)
+    else:
+        items = corpus.build(include_carrier=not args.no_carrier, extra_files=extra,
+                             include_nonword=args.include_nonword)
     if args.only:
         pats = [p.strip() for p in args.only.split(",") if p.strip()]
         items = [i for i in items if any(p in i.id or p in i.axis for p in pats)]
@@ -248,7 +255,9 @@ def main() -> None:
 
         # 결함 후보의 wav만 남긴다. 이 루프의 최종 산출물은 "들어볼 파일 목록"이라,
         # 정답인 wav까지 쌓아두면 디스크만 먹고 쓸 일이 없다.
-        if not any_bad and not args.keep_all_wav:
+        # 격자 문항은 애초에 실재 낱말이 아니라 거의 전부 "오답"으로 잡힌다.
+        # 산출물이 통계지 들어볼 파일이 아니므로 wav를 남기지 않는다.
+        if (it.mode == "grid" or not any_bad) and not args.keep_all_wav:
             wav.unlink(missing_ok=True)
             conn.execute("UPDATE trial SET wav='' WHERE id=?", (trial_id,))
         else:

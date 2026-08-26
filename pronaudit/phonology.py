@@ -73,8 +73,29 @@ def _coda_tail(t: str) -> str | None:
     return CLUSTER[t][1] if t in CLUSTER else None
 
 
+_CHUNK = re.compile(r"[^가-힣 ]+")
+
+
 def surface(text: str, loose: bool = False) -> str:
-    """표기 → 표면 발음형(한글 음절열)."""
+    """표기 → 표면 발음형(한글 음절열).
+
+    쉼표·마침표에서는 규칙을 끊는다. "가락, 미둡"은 쉼표에서 끊어 읽으므로
+    ㄱ+ㅁ 비음화가 일어나지 않는다. 끊지 않으면 없는 변동이 정답에 들어간다.
+    (띄어쓰기는 끊지 않는다 — STT의 띄어쓰기는 원문과 다르기 일쑤라
+    거기서 끊으면 비교가 흔들린다.)
+    """
+    return "".join(surface_parts(text, loose))
+
+
+def surface_parts(text: str, loose: bool = False) -> list[str]:
+    """구두점으로 끊은 조각별 표면형. 조각 경계는 실제로 끊어 읽는 자리라,
+    통계에서 조각 사이 경계를 빼려면 이 경계 위치를 알아야 한다."""
+    return [_surface_chunk(part, loose)
+            for part in _CHUNK.split(unicodedata.normalize("NFC", text))
+            if part.strip()]
+
+
+def _surface_chunk(text: str, loose: bool = False) -> str:
     s = _split(text)
     n = len(s)
 
@@ -103,6 +124,8 @@ def surface(text: str, loose: bool = False) -> str:
             head = _coda_head(t)
             if head in ASPIRATE and head != "ㅅ":
                 nxt[0] = ASPIRATE[head]
+                if nxt[0] == "ㅌ" and nxt[1] == "ㅣ":   # 굳히다 → 구치다
+                    nxt[0] = "ㅊ"
                 s[i][2] = " " if t not in CLUSTER else CLUSTER[t][0]
                 if t in CLUSTER:
                     # ㄺ+ㅎ → ㄹ+ㅋ
