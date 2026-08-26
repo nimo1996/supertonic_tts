@@ -124,6 +124,34 @@ def rate(pair) -> float:
     return pair[1] / pair[0] if pair[0] else 0.0
 
 
+def adds_sound(target: str, partner: str) -> bool:
+    """짝이 원본보다 소리를 더 갖고 있나.
+
+    방향만으로는 부족하다. "사외"가 늘 "사회"로 적히는 건 없던 ㅎ이 생긴
+    것이고, TTS가 내지도 않은 소리를 STT가 들을 수는 없다 — STT가 흔한
+    낱말을 고른 것이다. 반대로 "영향"이 "영양"이 되는 건 있던 ㅎ이 빠진
+    것이고, 이건 TTS가 실제로 못 낸 것일 수 있다. 둘을 섞으면 안 된다.
+    """
+    import phonology
+    from jamo import to_tokens
+
+    def material(word: str) -> int:
+        # 초성 ㅇ은 소리가 아니라 자리 채우개라 세지 않는다
+        return sum(1 for t in to_tokens(phonology.surface(word))
+                   if not (t.kind == "C" and t.jamo == "ㅇ"))
+
+    return material(partner) > material(target)
+
+
+def dir_note(src: str, dst: str) -> str:
+    """한쪽으로만 쏠릴 때 그게 무슨 일인지."""
+    if adds_sound(src, dst):
+        return "없던 소리가 생김 — STT 어휘편향"
+    if adds_sound(dst, src):
+        return "있던 소리가 빠짐 — TTS 결함 후보"
+    return "소리 수는 같고 자질만 바뀜 — 대립 붕괴"
+
+
 def lm_prior(m: dict, w: dict, pd: dict) -> str:
     """STT 언어모델이 더 흔한 낱말로 끌어당긴 것인가.
 
@@ -135,9 +163,11 @@ def lm_prior(m: dict, w: dict, pd: dict) -> str:
         d = pd.get(j)
         if not d:
             continue
-        fwd, n_self, rev, n_partner, partner = d
+        word, fwd, n_self, rev, n_partner, partner = d
         if n_self < 4 or n_partner < 4:
             continue
+        if not adds_sound(word, partner):
+            continue   # 소리가 빠지는 쪽 — TTS 결함일 수 있다
         if fwd / n_self >= 0.5 and rev / n_partner <= 0.15:
             return partner
     return ""
@@ -226,7 +256,8 @@ def main() -> None:
             partner = pairs.get(word)
             if not partner:
                 continue
-            out[j] = (cross.get((word, partner, j), 0), tried.get((word, j), 0),
+            out[j] = (word,
+                      cross.get((word, partner, j), 0), tried.get((word, j), 0),
                       cross.get((partner, word, j), 0), tried.get((partner, j), 0),
                       partner)
         return out
@@ -295,9 +326,9 @@ def main() -> None:
             if fwd and rev:
                 note = "양방향 — 대립 자체가 무너짐"
             elif fwd:
-                note = f"{x}{josa(x, '만/만')} {y}{josa(y)} 쏠림"
+                note = f"{x}→{y} 한 방향 — {dir_note(x, y)}"
             else:
-                note = f"{y}{josa(y, '만/만')} {x}{josa(x)} 쏠림"
+                note = f"{y}→{x} 한 방향 — {dir_note(y, x)}"
             print(f"  {x+' / '+y:20s} {j:10s} {fr:>8s} {rr:>8s}   {note}")
     else:
         print("  (없음)")
