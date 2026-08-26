@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import jamo
@@ -37,7 +37,7 @@ class Cell:
         self.words = set()
         self.bad_words = set()
         self.voices = set()
-        self.examples = defaultdict(int)
+        self.examples = Counter()
 
     def add(self, bad: bool, word: str, voice: str, ex: str = ""):
         self.n += 1
@@ -57,7 +57,7 @@ class Cell:
 def collect(conn, judge: str, max_cer: float = 0.6):
     """토큰 자리마다 (조합, 무너졌나)를 센다."""
     rows = conn.execute("""
-        SELECT t.text, t.expect, t.target, t.voice, h.text AS hyp
+        SELECT t.text, t.expect, t.target, t.voice, t.mode, h.text AS hyp
         FROM trial t JOIN hyp h ON h.trial_id = t.id
         WHERE h.judge = ? AND h.judgeable = 1 AND t.sensitivity = 'high'
           AND t.text NOT GLOB '*[0-9A-Za-z%]*'
@@ -67,7 +67,7 @@ def collect(conn, judge: str, max_cer: float = 0.6):
               ("boundary", "onset_nucleus", "nucleus_coda", "jamo", "onset_pos")}
     total = [0, 0]
 
-    for text, expect_json, target, voice, hyp in rows:
+    for text, expect_json, target, voice, mode, hyp in rows:
         expects = json.loads(expect_json)
         sh = phonology.surface(hyp)
         best = None
@@ -82,10 +82,11 @@ def collect(conn, judge: str, max_cer: float = 0.6):
 
         # 쉼표로 끊어 읽는 자리는 조합이 아니다. 조각 경계를 넘는 관찰은 뺀다.
         parts = phonology.surface_parts(json.loads(expect_json)[0])
-        chunk_of, at = {}, 0
+        chunk_of, chunk_text, at = {}, {}, 0
         for ci, part in enumerate(parts):
             for k in range(len(part)):
                 chunk_of[at + k] = ci
+            chunk_text[ci] = part
             at += len(part)
 
         ref = jamo.to_tokens(se)
@@ -101,17 +102,21 @@ def collect(conn, judge: str, max_cer: float = 0.6):
             broke[i] = e.op != "eq"
             got[i] = (e.hyp.jamo if e.hyp is not None else "∅")
 
-        word = target or text
+        base_word = target or text
         for idx, tok in enumerate(ref):
             key = (tok.syl, tok.kind)
             if key not in broke:
                 continue
             bad = broke[key]
+
             total[0] += 1
             total[1] += bad
             out = f"{tok.jamo}→{got[key]}"
 
             here = chunk_of.get(tok.syl, 0)
+            # 격자는 발화 하나에 토큰 여러 개를 담으므로, 지지 근거를 셀 때는
+            # 발화가 아니라 토큰을 센다. 안 그러면 "낱말 1개"로 보인다.
+            word = chunk_text[here] if mode == "grid" else base_word
             prev = ref[idx - 1] if idx else None
             nxt = ref[idx + 1] if idx + 1 < len(ref) else None
             if prev is not None and chunk_of.get(prev.syl, 0) != here:
@@ -163,6 +168,39 @@ def show(title: str, cells: dict, base: float, min_words: int, min_n: int, top: 
     return rows
 
 
+def agree(per_judge: dict, tables_key: str, title: str,
+          min_words: int, min_n: int, lift: float, top: int):
+    """두 판정기가 **함께** 무너진 조합만 남긴다.
+
+    무의미 음절은 STT가 가까운 실재 낱말로 바꿔 적는 편향이 있고, 그게
+    이 격자의 바닥(18% 안팎)을 만든다. 그런데 그 편향은 모델의 언어모델에서
+    오는 것이라 구조가 다른 두 모델에서 같은 자리에 나타날 이유가 없다.
+    둘 다 같은 조합에서 무너지면 소리 쪽 원인일 가능성이 훨씬 높다.
+    """
+    rows = []
+    for k in set(per_judge["moonshine"][0][tables_key]) & set(per_judge["whisper"][0][tables_key]):
+        cells = {j: per_judge[j][0][tables_key][k] for j in JUDGES}
+        bases = {j: per_judge[j][1] for j in JUDGES}
+        if any(cells[j].n < min_n or len(cells[j].words) < min_words for j in JUDGES):
+            continue
+        lifts = {j: (cells[j].rate / bases[j] if bases[j] else 0) for j in JUDGES}
+        if min(lifts.values()) < lift:
+            continue
+        rows.append((min(lifts.values()), k, cells, lifts))
+    rows.sort(reverse=True)
+    print(f"\n  {title}  — 두 판정기 모두 기준선 {lift:.0f}배 이상")
+    if not rows:
+        print("    (해당 없음)")
+        return
+    print(f"    {'조합':10s} {'moon':>14s} {'whis':>14s} {'토큰':>4s}  주로 이렇게")
+    for _, k, cells, lifts in rows[:top]:
+        m, w = cells["moonshine"], cells["whisper"]
+        ex = ", ".join(e for e, _ in
+                       sorted((m.examples + w.examples).items(), key=lambda x: -x[1])[:3])
+        print(f"    {k:10s} {m.rate*100:6.1f}%({lifts['moonshine']:4.1f}x) "
+              f"{w.rate*100:6.1f}%({lifts['whisper']:4.1f}x) {len(m.words):4d}  {ex}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="글자 조합별 실패율")
     ap.add_argument("--db", default=str(HERE / "data" / "audit.sqlite"))
@@ -170,17 +208,33 @@ def main() -> None:
                     help="서로 다른 낱말 이만큼에서 나와야 규칙 후보로 본다")
     ap.add_argument("--min-n", type=int, default=30)
     ap.add_argument("--top", type=int, default=15)
+    ap.add_argument("--lift", type=float, default=2.0,
+                    help="합의 표에서 요구하는 기준선 대비 배수")
     ap.add_argument("--max-cer", type=float, default=0.6,
                     help="이보다 심하게 틀린 시행은 자리별 귀속이 불가능해 뺀다")
     args = ap.parse_args()
 
     conn = sqlite3.connect(args.db)
+    per_judge = {}
     for judge in JUDGES:
         tables, total = collect(conn, judge, args.max_cer)
-        base = total[1] / total[0] if total[0] else 0.0
+        per_judge[judge] = (tables, total[1] / total[0] if total[0] else 0.0)
+
+    print("=" * 86)
+    print("  두 판정기 합의 — 규칙 후보")
+    print("=" * 86)
+    for key, title in (("boundary", "① 앞 종성 + 뒤 초성"),
+                       ("onset_nucleus", "② 초성 + 중성"),
+                       ("nucleus_coda", "③ 중성 + 종성"),
+                       ("onset_pos", "④ 초성 위치별")):
+        agree(per_judge, key, title, args.min_words, args.min_n, args.lift, args.top)
+    print()
+
+    for judge in JUDGES:
+        tables, base = per_judge[judge]
+        total = [0, 0]
         print("=" * 86)
-        print(f"  [{judge}]  자모 {total[0]}자리 중 {total[1]}자리 무너짐 "
-              f"— 기준선 {base*100:.1f}%")
+        print(f"  [{judge}]  기준선 {base*100:.1f}%")
         print("=" * 86)
         show("① 앞 종성 + 뒤 초성 (경계 조합)", tables["boundary"],
              base, args.min_words, args.min_n, args.top)
